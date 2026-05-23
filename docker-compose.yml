@@ -1,0 +1,69 @@
+# =========================================================================
+# DOCKER COMPOSE CONFIGURATION
+# Giúp khởi chạy toàn bộ Hệ thống (DB + Backend + Frontend) chỉ với 1 click!
+# Phục vụ chạy thử nội bộ (Localhost) & Triển khai nhanh chóng lên Server
+# =========================================================================
+
+version: '3.8'
+
+services:
+  # 1. DỊCH VỤ DATABASE (MySQL)
+  db:
+    image: mysql:8.0
+    container_name: cnpm-mysql-container
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password_here   # Mật khẩu tài khoản root
+      MYSQL_DATABASE: cnpm_assignment           # Database chính tự động tạo khi chạy
+      MYSQL_USER: cnpm_user                     # Tài khoản user thường dùng
+      MYSQL_PASSWORD: cnpm_password_here       # Mật khẩu user thường dùng
+    ports:
+      - "3308:3306"                             # Ánh xạ cổng 3306 của MySQL ra cổng 3308 của máy thật để tránh trùng lặp
+    volumes:
+      - mysql_data:/var/lib/mysql               # Lưu trữ dữ liệu lâu bền (Persist), không sợ mất data khi tắt container
+    networks:
+      - cnpm_network
+
+  # 2. DỊCH VỤ BACKEND (Express / Node.js)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cnpm-backend-container
+    restart: always
+    ports:
+      - "3000:3000"                             # Mở cổng 3000 để Frontend gọi API
+    environment:
+      - DB_HOST=db                              # Kết nối trực tiếp qua tên Service trong mạng Docker (không dùng localhost)
+      - DB_PORT=3306
+      - DB_USER=cnpm_user
+      - DB_PASS=cnpm_password_here
+      - DB_NAME=cnpm_assignment
+      - JWT_SECRET=super_secret_key_12345       # Khóa bí mật mã hóa JWT Token
+      - PORT=3000
+    depends_on:
+      - db                                      # Backend sẽ đợi Database khởi động xong trước mới chạy
+    networks:
+      - cnpm_network
+
+  # 3. DỊCH VỤ FRONTEND (React / Vite + Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cnpm-frontend-container
+    restart: always
+    ports:
+      - "80:80"                                 # Triển khai trực tiếp cổng 80 chuẩn Web lên Domain / Localhost
+    depends_on:
+      - backend                                 # Đợi Backend chạy trước
+    networks:
+      - cnpm_network
+
+# Định nghĩa các tài nguyên chung
+volumes:
+  mysql_data:                                   # Volume lưu trữ dữ liệu MySQL
+
+networks:
+  cnpm_network:                                 # Mạng nội bộ cho các container nói chuyện với nhau
+    driver: bridge
