@@ -38,14 +38,15 @@ export const createDepartment = async (req, res) => {
 export const updateDepartment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description } = req.body;
+    const { name, description, is_deleted } = req.body;
     const updatedDepartment = await Department.findByIdAndUpdate(
       id,
       {
         name,
-        description
+        description,
+        is_deleted
       },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!updatedDepartment) {

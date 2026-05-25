@@ -1,32 +1,26 @@
 import mongoose from "mongoose";
 
-const departmentSchema = new mongoose.Schema(
+const userSchema = new mongoose.Schema(
   {
-    code: {
+    username: {
       type: String,
       required: true,
       unique: true,
       trim: true,
     },
-
-    name: {
+    password_hash: {
       type: String,
       required: true,
-      trim: true,
     },
-
-    description: {
-      type: String,
+    role_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Role",
       default: null,
-      trim: true,
     },
-
     status: {
       type: String,
-      enum: ["active", "inactive"],
       default: "active",
     },
-
     is_deleted: {
       type: Boolean,
       default: false,
@@ -35,9 +29,7 @@ const departmentSchema = new mongoose.Schema(
   {
     timestamps: true,
     versionKey: false,
-  },
+  }
 );
 
-const Department = mongoose.model("Department", departmentSchema);
-
-export default Department;
+export default mongoose.model("User", userSchema);

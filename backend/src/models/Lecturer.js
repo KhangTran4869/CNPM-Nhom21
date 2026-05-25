@@ -1,4 +1,4 @@
-import mongoose from "mongoose";   
+import mongoose from "mongoose";
 
 const lecturerSchema = new mongoose.Schema(
   {
@@ -64,7 +64,7 @@ const lecturerSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 const Lecturer = mongoose.model("Lecturer", lecturerSchema);

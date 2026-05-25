@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const departmentSchema = new mongoose.Schema(
+const courseSchema = new mongoose.Schema(
   {
     code: {
       type: String,
@@ -8,25 +8,20 @@ const departmentSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
-
     name: {
       type: String,
       required: true,
       trim: true,
     },
-
-    description: {
-      type: String,
+    credits: {
+      type: Number,
       default: null,
-      trim: true,
     },
-
-    status: {
-      type: String,
-      enum: ["active", "inactive"],
-      default: "active",
+    department_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Department",
+      default: null,
     },
-
     is_deleted: {
       type: Boolean,
       default: false,
@@ -35,9 +30,7 @@ const departmentSchema = new mongoose.Schema(
   {
     timestamps: true,
     versionKey: false,
-  },
+  }
 );
 
-const Department = mongoose.model("Department", departmentSchema);
-
-export default Department;
+export default mongoose.model("Course", courseSchema);

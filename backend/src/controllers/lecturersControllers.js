@@ -43,7 +43,7 @@ export const createLecturer = async (req, res) => {
 export const updateLecturer = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, phone, degree, department_id, user_id, max_hours } = req.body;
+    const { name, email, phone, degree, department_id, user_id, max_hours, status, is_deleted } = req.body;
     const updatedLecturer = await Lecturer.findByIdAndUpdate(
       id,
       {
@@ -54,8 +54,10 @@ export const updateLecturer = async (req, res) => {
         department_id,
         user_id,
         max_hours,
+        status,
+        is_deleted
       },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!updatedLecturer) {
