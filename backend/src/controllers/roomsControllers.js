@@ -1,95 +1,34 @@
-import Room from "../models/Room.js"; 
+import Room from "../models/Room.js";
+import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
 
-export const getAllRooms = async (req, res) => {
-    try{
-        const rooms = await Room.find().sort({ createdAt: 'desc' }); 
-        res.status(200).json(rooms);
-    }catch(error){
-        console.log("Lỗi lấy danh sách phòng:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi lấy danh sách phòng",
-      error: error.message,
-    });
-  }
-};
+export const getAllRooms = asyncHandler(async (_req, res) => {
+  const rooms = await Room.find({ is_deleted: false }).sort({ createdAt: "desc" });
+  return successResponse(res, rooms);
+});
 
-export const createRoom = async (req, res) => {
-  try {
-    const { name, capacity } = req.body;
+export const createRoom = asyncHandler(async (req, res) => {
+  const { name, capacity } = req.body;
+  if (!name) return errorResponse(res, "Dữ liệu không hợp lệ", ["NAME_REQUIRED"], 400);
+  const room = await Room.create({ name, capacity });
+  return successResponse(res, room, "Tạo phòng học thành công", 201);
+});
 
-    const newRoom = new Room({
-      name,
-      capacity
-    });
-    const savedRoom = await newRoom.save(); 
-    res.status(201).json(savedRoom);
-  } catch (error) {
-    console.log("Lỗi thêm phòng:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi thêm phòng",
-      error: error.message,
-    });
-  }
-};
+export const updateRoom = asyncHandler(async (req, res) => {
+  const room = await Room.findOneAndUpdate(
+    { _id: req.params.id, is_deleted: false },
+    req.body,
+    { new: true },
+  );
+  if (!room) return errorResponse(res, "Phòng không tồn tại", ["ROOM_NOT_FOUND"], 404);
+  return successResponse(res, room);
+});
 
-export const updateRoom = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, capacity, is_deleted } = req.body;
-    const updatedRoom = await Room.findByIdAndUpdate(
-      id,
-      {
-        name,
-        capacity,
-        is_deleted
-      },
-      { returnDocument: "after" }
-    );
-
-    if (!updatedRoom) {
-      return res.status(404).json({
-        success: false,
-        message: "Phòng không tồn tại",
-      });
-    }
-
-    res.status(200).json(updatedLecturer);
-
-  } catch (error) {
-    console.log("Lỗi cập nhật giảng viên:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi cập nhật giảng viên",
-      error: error.message,
-    });
-  }
-};
-
-export const deleteRoom = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const deletedRoom = await Room.findByIdAndDelete(id);
-
-    if (!deletedRoom) {
-      return res.status(404).json({
-        success: false,
-        message: "Phòng không tồn tại",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Phòng đã được xóa",
-    });
-  } catch (error) {
-    console.log("Lỗi xóa phòng:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi xóa phòng",
-      error: error.message,
-    });
-  }
-};
+export const deleteRoom = asyncHandler(async (req, res) => {
+  const room = await Room.findOneAndUpdate(
+    { _id: req.params.id, is_deleted: false },
+    { is_deleted: true },
+    { new: true },
+  );
+  if (!room) return errorResponse(res, "Phòng không tồn tại", ["ROOM_NOT_FOUND"], 404);
+  return successResponse(res, room, "Phòng đã được xóa");
+});

@@ -1,11 +1,13 @@
 import express from "express";
 import { createLecturerAvailability, deleteLecturerAvailability, getAllLecturerAvailabilities, updateLecturerAvailability } from "../controllers/lecturerAvailabilityControllers.js";
+import { authenticate, authorize } from "../middlewares/auth.js";
 
 const routes = express.Router();
 
-routes.get("/", getAllLecturerAvailabilities);
-routes.post("/", createLecturerAvailability);
-routes.put("/:id", updateLecturerAvailability);
-routes.delete("/:id", deleteLecturerAvailability);
+routes.use(authenticate);
+routes.get("/", authorize("ADMIN", "HEAD", "LECTURER"), getAllLecturerAvailabilities);
+routes.post("/", authorize("ADMIN", "LECTURER"), createLecturerAvailability);
+routes.put("/:id", authorize("ADMIN", "LECTURER"), updateLecturerAvailability);
+routes.delete("/:id", authorize("ADMIN", "LECTURER"), deleteLecturerAvailability);
 
 export default routes;

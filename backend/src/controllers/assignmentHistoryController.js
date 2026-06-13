@@ -1,98 +1,36 @@
-import AssignmentHistory from "../models/AssignmentHistory.js"; 
+import AssignmentHistory from "../models/AssignmentHistory.js";
+import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
 
-export const getAllAssignmentsHistory = async (req, res) => {
-    try{
-        const assignmentHistory = await AssignmentHistory.find().sort({ createdAt: 'desc' }); 
-        res.status(200).json(assignmentHistory);
-    }catch(error){
-        console.log("Lỗi lấy danh sách lịch sử nhiệm vụ:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi lấy danh sách lịch sử nhiệm vụ",
-      error: error.message,
-    });
-  }
-};
+export const getAllAssignmentsHistory = asyncHandler(async (req, res) => {
+  const filter = { is_deleted: false };
+  if (req.params.assignment_id) filter.assignment_id = req.params.assignment_id;
+  const history = await AssignmentHistory.find(filter)
+    .populate("assignment_id old_lecturer_id new_lecturer_id")
+    .sort({ changed_at: "desc" });
+  return successResponse(res, history);
+});
 
-export const createAssignmentHistory = async (req, res) => {
-  try {
-    const { assignment_id, old_lecturer_id, new_lecturer_id, changed_at } = req.body;
+export const createAssignmentHistory = asyncHandler(async (req, res) => {
+  const history = await AssignmentHistory.create(req.body);
+  return successResponse(res, history, "Tạo lịch sử phân công thành công", 201);
+});
 
-    const newAssignmentHistory = new AssignmentHistory({
-      assignment_id,
-      old_lecturer_id,
-      new_lecturer_id,
-      changed_at: changed_at || Date.now(),
-    });
-    const savedAssignmentHistory = await newAssignmentHistory.save(); 
-    res.status(201).json(savedAssignmentHistory);
-  } catch (error) {
-    console.log("Lỗi thêm lịch sử nhiệm vụ:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi thêm lịch sử nhiệm vụ",
-      error: error.message,
-    });
-  }
-};
+export const updateAssignmentHistory = asyncHandler(async (req, res) => {
+  const history = await AssignmentHistory.findOneAndUpdate(
+    { _id: req.params.id, is_deleted: false },
+    req.body,
+    { new: true },
+  );
+  if (!history) return errorResponse(res, "Lịch sử phân công không tồn tại", ["HISTORY_NOT_FOUND"], 404);
+  return successResponse(res, history);
+});
 
-export const updateAssignmentHistory = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { assignment_id, old_lecturer_id, new_lecturer_id, changed_at, is_deleted } = req.body;
-    const updatedAssignmentHistory = await AssignmentHistory.findByIdAndUpdate(
-      id,
-      {
-        assignment_id,
-        old_lecturer_id,
-        new_lecturer_id,
-        changed_at,
-        is_deleted
-      },
-      { returnDocument: "after" }
-    );
-
-    if (!updatedAssignmentHistory) {
-      return res.status(404).json({
-        success: false,
-        message: "Lịch sử nhiệm vụ không tồn tại",
-      });
-    }
-
-    res.status(200).json(updatedAssignmentHistory);
-
-  } catch (error) {
-    console.log("Lỗi cập nhật lịch sử nhiệm vụ:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi cập nhật lịch sử nhiệm vụ",
-      error: error.message,
-    });
-  }
-};
-
-export const deleteAssignmentHistory = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const deletedAssignmentHistory = await AssignmentHistory.findByIdAndDelete(id);
-    if (!deletedAssignmentHistory) {
-      return res.status(404).json({
-        success: false,
-        message: "Lịch sử nhiệm vụ không tồn tại",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Lịch sử nhiệm vụ đã được xóa",
-    });
-  } catch (error) {
-    console.log("Lỗi xóa lịch sử nhiệm vụ:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi xóa lịch sử nhiệm vụ",
-      error: error.message,
-    });
-  }
-};
+export const deleteAssignmentHistory = asyncHandler(async (req, res) => {
+  const history = await AssignmentHistory.findOneAndUpdate(
+    { _id: req.params.id, is_deleted: false },
+    { is_deleted: true },
+    { new: true },
+  );
+  if (!history) return errorResponse(res, "Lịch sử phân công không tồn tại", ["HISTORY_NOT_FOUND"], 404);
+  return successResponse(res, history, "Lịch sử phân công đã được xóa");
+});

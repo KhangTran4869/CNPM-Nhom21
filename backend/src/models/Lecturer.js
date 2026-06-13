@@ -34,7 +34,7 @@ const lecturerSchema = new mongoose.Schema(
       default: null,
     },
 
-    department: {
+    department_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Department",
       default: null,
@@ -53,8 +53,8 @@ const lecturerSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["active", "inactive"],
-      default: "active",
+      enum: ["ACTIVE", "BUSY", "INACTIVE"],
+      default: "ACTIVE",
     },
 
     is_deleted: {

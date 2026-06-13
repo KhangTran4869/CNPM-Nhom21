@@ -14,7 +14,8 @@ const assignmentSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      default: "pending",
+      enum: ["PENDING", "APPROVED", "REJECTED"],
+      default: "PENDING",
     },
     assigned_by: {
       type: mongoose.Schema.Types.ObjectId,

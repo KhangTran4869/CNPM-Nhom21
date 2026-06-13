@@ -20,7 +20,8 @@ const classSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      default: "active",
+      enum: ["OPEN", "ASSIGNED", "ACTIVE", "COMPLETED", "CANCELLED"],
+      default: "OPEN",
     },
     max_students: {
       type: Number,

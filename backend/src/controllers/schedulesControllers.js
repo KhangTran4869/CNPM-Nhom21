@@ -1,100 +1,71 @@
-import Schedule from "../models/Schedule.js"; 
+import Assignment from "../models/Assignment.js";
+import Class from "../models/Class.js";
+import Room from "../models/Room.js";
+import Schedule from "../models/Schedule.js";
+import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
+import mongoose from "mongoose";
 
-export const getAllSchedules = async (req, res) => {
-    try{
-        const schedules = await Schedule.find().sort({ createdAt: 'desc' }); 
-        res.status(200).json(schedules);
-    }catch(error){
-        console.log("Lỗi lấy danh sách lịch dạy:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi lấy danh sách lịch dạy",
-      error: error.message,
-    });
-  }
+const validateSchedule = ({ day_of_week, start_period, end_period }) => {
+  const errors = [];
+  if (Number(day_of_week) < 2 || Number(day_of_week) > 8) errors.push("DAY_OF_WEEK_INVALID");
+  if (Number(start_period) <= 0) errors.push("START_PERIOD_INVALID");
+  if (Number(end_period) < Number(start_period)) errors.push("END_PERIOD_INVALID");
+  return errors;
 };
 
-export const createSchedule = async (req, res) => {
-  try {
-    const { class_id, day_of_week, start_period, end_period, room_id } = req.body;
+const classLocked = (classId) =>
+  Assignment.exists({ class_id: classId, status: "APPROVED", is_deleted: false });
 
-    const newSchedule = new Schedule({
-        class_id,       
-        day_of_week,
-        start_period,
-        end_period,
-        room_id
-    });
-    const savedSchedule = await newSchedule.save(); 
-    res.status(201).json(savedSchedule);
-  } catch (error) {
-    console.log("Lỗi thêm lịch dạy:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi thêm lịch dạy",
-      error: error.message,
-    });
+export const getAllSchedules = asyncHandler(async (req, res) => {
+  const filter = { is_deleted: false };
+  if (req.params.class_id) filter.class_id = req.params.class_id;
+  const schedules = await Schedule.find(filter).populate("class_id room_id").sort({ createdAt: "desc" });
+  return successResponse(res, schedules);
+});
+
+export const createSchedule = asyncHandler(async (req, res) => {
+  const classId = req.params.class_id || req.body.class_id;
+  const { day_of_week, start_period, end_period, room_id } = req.body;
+  const errors = validateSchedule(req.body);
+
+  if (!mongoose.isValidObjectId(classId)) errors.push("CLASS_ID_INVALID");
+  if (!mongoose.isValidObjectId(room_id)) errors.push("ROOM_ID_INVALID");
+  if (errors.length) return errorResponse(res, "Dữ liệu không hợp lệ", errors, 400);
+
+  const classDoc = await Class.findOne({ _id: classId, is_deleted: false });
+  const room = await Room.findOne({ _id: room_id, is_deleted: false });
+  if (!classDoc) errors.push("CLASS_NOT_FOUND");
+  if (!room) errors.push("ROOM_NOT_FOUND");
+  if (classDoc && room && Number(classDoc.max_students || 0) > Number(room.capacity || 0)) {
+    errors.push({ rule: "ROOM_CAPACITY_INVALID", message: "Phòng học không đủ sức chứa" });
   }
-};
+  if (await classLocked(classId)) errors.push("ASSIGNMENT_LOCKED");
+  if (errors.length) return errorResponse(res, "Dữ liệu không hợp lệ", errors, errors.includes("ASSIGNMENT_LOCKED") ? 409 : 400);
 
-export const updateSchedule = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { class_id, day_of_week, start_period, end_period, room_id, is_deleted } = req.body;
-    const updatedSchedule = await Schedule.findByIdAndUpdate(
-      id,
-      {
-        class_id,
-        day_of_week,
-        start_period,
-        end_period,
-        room_id,
-        is_deleted
-      },
-      { returnDocument: "after" }
-    );
+  const schedule = await Schedule.create({ class_id: classId, day_of_week, start_period, end_period, room_id });
+  return successResponse(res, schedule, "Tạo lịch học thành công", 201);
+});
 
-    if (!updatedSchedule) {
-      return res.status(404).json({
-        success: false,
-        message: "Lịch dạy không tồn tại",
-      });
-    }
-
-    res.status(200).json(updatedLecturer);
-
-  } catch (error) {
-    console.log("Lỗi cập nhật lịch dạy:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi cập nhật lịch dạy",
-      error: error.message,
-    });
+export const updateSchedule = asyncHandler(async (req, res) => {
+  const existing = await Schedule.findOne({ _id: req.params.id, is_deleted: false });
+  if (!existing) return errorResponse(res, "Lịch dạy không tồn tại", ["SCHEDULE_NOT_FOUND"], 404);
+  if (await classLocked(existing.class_id)) {
+    return errorResponse(res, "Không thể sửa lịch lớp đã có phân công được duyệt", ["ASSIGNMENT_LOCKED"], 409);
   }
-};
+  const errors = validateSchedule({ ...existing.toObject(), ...req.body });
+  if (errors.length) return errorResponse(res, "Dữ liệu không hợp lệ", errors, 400);
 
-export const deleteSchedule = async (req, res) => {
-  try {
-    const { id } = req.params;
+  const schedule = await Schedule.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  return successResponse(res, schedule);
+});
 
-    const deletedSchedule = await Schedule.findByIdAndDelete(id);
-    if (!deletedSchedule) {
-      return res.status(404).json({
-        success: false,
-        message: "Lịch dạy không tồn tại",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Lịch dạy đã được xóa",
-    });
-  } catch (error) {
-    console.log("Lỗi xóa lịch dạy:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi xóa lịch dạy",
-      error: error.message,
-    });
+export const deleteSchedule = asyncHandler(async (req, res) => {
+  const schedule = await Schedule.findOne({ _id: req.params.id, is_deleted: false });
+  if (!schedule) return errorResponse(res, "Lịch dạy không tồn tại", ["SCHEDULE_NOT_FOUND"], 404);
+  if (await classLocked(schedule.class_id)) {
+    return errorResponse(res, "Không thể xóa lịch lớp đã có phân công được duyệt", ["ASSIGNMENT_LOCKED"], 409);
   }
-};
+  schedule.is_deleted = true;
+  await schedule.save();
+  return successResponse(res, schedule, "Lịch dạy đã được xóa");
+});
