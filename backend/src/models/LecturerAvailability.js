@@ -21,7 +21,8 @@ const lecturerAvailabilitySchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      default: "available",
+      enum: ["BUSY", "FREE"],
+      default: "BUSY",
     },
     is_deleted: {
       type: Boolean,

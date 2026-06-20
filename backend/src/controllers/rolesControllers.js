@@ -1,93 +1,37 @@
-import Role from "../models/Role.js"; 
+import Role from "../models/Role.js";
+import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
+import { normalizeCode } from "../utils/constants.js";
 
-export const getAllRoles = async (req, res) => {
-    try{
-        const roles = await Role.find().sort({ createdAt: 'desc' }); 
-        res.status(200).json(roles);
-    }catch(error){
-        console.log("Lỗi lấy danh sách vai trò:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi lấy danh sách vai trò",
-      error: error.message,
-    });
+export const getAllRoles = asyncHandler(async (_req, res) => {
+  const roles = await Role.find({ is_deleted: false }).sort({ createdAt: "desc" });
+  return successResponse(res, roles);
+});
+
+export const createRole = asyncHandler(async (req, res) => {
+  const { code, name } = req.body;
+  if (!code || !name) {
+    return errorResponse(res, "Dữ liệu không hợp lệ", ["CODE_NAME_REQUIRED"], 400);
   }
-};
+  const role = await Role.create({ code: normalizeCode(code), name });
+  return successResponse(res, role, "Tạo vai trò thành công", 201);
+});
 
-export const createRole = async (req, res) => {
-  try {
-    const { code, name} = req.body;
+export const updateRole = asyncHandler(async (req, res) => {
+  const role = await Role.findOneAndUpdate(
+    { _id: req.params.id, is_deleted: false },
+    { ...req.body, code: req.body.code ? normalizeCode(req.body.code) : undefined },
+    { new: true },
+  );
+  if (!role) return errorResponse(res, "Vai trò không tồn tại", ["ROLE_NOT_FOUND"], 404);
+  return successResponse(res, role);
+});
 
-    const newRole = new Role({
-      code,
-      name
-    });
-    const savedRole = await newRole.save();
-    res.status(201).json(savedRole);
-  } catch (error) {
-    console.log("Lỗi thêm vai trò:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi thêm vai trò",
-      error: error.message,
-    });
-  }
-};
-     
-export const updateRole = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, code, is_deleted } = req.body;
-    const updatedRole = await Role.findByIdAndUpdate(
-      id,
-      {
-        name,
-        code,
-        is_deleted
-      },
-      { returnDocument: "after" }
-    );
-
-    if (!updatedRole) {
-      return res.status(404).json({
-        success: false,
-        message: "Vai trò không tồn tại",
-      });
-    } 
-    res.status(200).json(updatedRole);
-
-  } catch (error) {
-    console.log("Lỗi cập nhật vai trò:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi cập nhật vai trò",
-      error: error.message,
-    });
-  }
-};
-
-export const deleteRole = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const deletedRole = await Role.findByIdAndDelete(id);
-    if (!deletedRole) {
-      return res.status(404).json({
-        success: false,
-        message: "Vai trò không tồn tại",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Vai trò đã được xóa",
-    });
-  } catch (error) {
-    console.log("Lỗi xóa vai trò:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi xóa vai trò",
-      error: error.message,
-    });
-  }
-};
+export const deleteRole = asyncHandler(async (req, res) => {
+  const role = await Role.findOneAndUpdate(
+    { _id: req.params.id, is_deleted: false },
+    { is_deleted: true },
+    { new: true },
+  );
+  if (!role) return errorResponse(res, "Vai trò không tồn tại", ["ROLE_NOT_FOUND"], 404);
+  return successResponse(res, role, "Vai trò đã được xóa");
+});

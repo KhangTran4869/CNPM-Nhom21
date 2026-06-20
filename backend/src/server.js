@@ -1,5 +1,7 @@
 import express from "express";
+import cors from "cors";
 import { connectDB } from "./config/db.js";
+import authRouters from "./routes/authRouters.js";
 import usersRouters from "./routes/usersRouters.js";
 import lecturersRouters from "./routes/lecturersRouters.js";
 import departmentsRouter from "./routes/departmentsRouters.js"
@@ -11,26 +13,51 @@ import rolesRouters from "./routes/rolesRouters.js";
 import assignmentsRouters from "./routes/assignmentsRouters.js";
 import assignmentHistoryRouters from "./routes/assignmentHistoryRouters.js";
 import classesRouters from "./routes/classesRouters.js";
-import coursesRouters from "./routes/coursesRouters.js";
+import coursesRouters from "./routes/CoursesRouters.js";
+import reportsRouters from "./routes/reportsRouters.js";
+import teachingRouters from "./routes/teachingRouters.js";
+import { errorResponse } from "./utils/apiResponse.js";
 import dotenv from "dotenv";
 
 dotenv.config();
 const PORT = process.env.PORT || 5000;
 const app = express();
 
+app.use(cors());
 app.use(express.json());
-app.use("/api/lecturers", lecturersRouters);
-app.use("/api/departments", departmentsRouter);
-app.use("/api/users", usersRouters);
-app.use("/api/semesters", semestersRouters);
-app.use("/api/rooms", roomsRouters);
-app.use("/api/schedules", schedulesRouters);
-app.use("/api/lecturer-availabilities", lecturerAvailabilityRouters);
-app.use("/api/roles", rolesRouters);
-app.use("/api/assignments", assignmentsRouters);  
-app.use("/api/assignment-history", assignmentHistoryRouters);
-app.use("/api/classes", classesRouters);
-app.use("/api/courses", coursesRouters);
+
+const mountApi = (prefix) => {
+  app.use(`${prefix}/auth`, authRouters);
+  app.use(`${prefix}/lecturers`, lecturersRouters);
+  app.use(`${prefix}/departments`, departmentsRouter);
+  app.use(`${prefix}/users`, usersRouters);
+  app.use(`${prefix}/semesters`, semestersRouters);
+  app.use(`${prefix}/rooms`, roomsRouters);
+  app.use(`${prefix}/schedules`, schedulesRouters);
+  app.use(`${prefix}/availability`, lecturerAvailabilityRouters);
+  app.use(`${prefix}/lecturer-availabilities`, lecturerAvailabilityRouters);
+  app.use(`${prefix}/roles`, rolesRouters);
+  app.use(`${prefix}/assignments`, assignmentsRouters);
+  app.use(`${prefix}/assignment-history`, assignmentHistoryRouters);
+  app.use(`${prefix}/classes`, classesRouters);
+  app.use(`${prefix}/courses`, coursesRouters);
+  app.use(`${prefix}/reports`, reportsRouters);
+  app.use(prefix, teachingRouters);
+};
+
+mountApi("/api/v1");
+mountApi("/api");
+
+app.use((req, res) => errorResponse(res, "Không tìm thấy API", ["NOT_FOUND"], 404));
+app.use((error, _req, res, _next) => {
+  console.error(error);
+  return errorResponse(
+    res,
+    error.message || "Lỗi server",
+    error.errors || [error.message],
+    error.statusCode || 500,
+  );
+});
 
 connectDB().then(() => {
   app.listen(PORT, () => {

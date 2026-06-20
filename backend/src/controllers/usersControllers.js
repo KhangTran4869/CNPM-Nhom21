@@ -1,98 +1,79 @@
-import User from "../models/User.js"; 
+import User from "../models/User.js";
+import Role from "../models/Role.js";
+import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
+import { normalizeCode, USER_STATUSES } from "../utils/constants.js";
+import { hashPassword } from "../utils/password.js";
 
-export const getAllUsers = async (req, res) => {
-    try{
-        const users = await User.find().sort({ createdAt: 'desc' }); 
-        res.status(200).json(users);
-    }catch(error){
-        console.log("Lỗi lấy danh sách người dùng:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi lấy danh sách người dùng",
-      error: error.message,
-    });
-  }
+const buildUserQuery = (query) => {
+  const filter = { is_deleted: false };
+  if (query.status) filter.status = normalizeCode(query.status);
+  if (query.keyword) filter.username = { $regex: query.keyword, $options: "i" };
+  if (query.role) filter.role_id = query.role;
+  return filter;
 };
 
-export const createUser = async (req, res) => {
-  try {
-    const { username, password_hash, role_id, status } = req.body;
+export const getAllUsers = asyncHandler(async (req, res) => {
+  const page = Number(req.query.page || 1);
+  const limit = Number(req.query.limit || 50);
+  const users = await User.find(buildUserQuery(req.query))
+    .populate("role_id")
+    .sort({ createdAt: "desc" })
+    .skip((page - 1) * limit)
+    .limit(limit);
+  return successResponse(res, users);
+});
 
-    const newUser = new User({
-        username,
-        password_hash,
-        role_id,
-        status
-    });
-    const savedUser= await newUser.save(); 
-    res.status(201).json(savedUser);
-  } catch (error) {
-    console.log("Lỗi thêm người dùng:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi thêm người dùng",
-      error: error.message,
-    });
-  }
-};
+export const createUser = asyncHandler(async (req, res) => {
+  const { username, password, role_id, status = "ACTIVE" } = req.body;
+  const errors = [];
+  if (!username) errors.push("USERNAME_REQUIRED");
+  if (!password || password.length < 6) errors.push("PASSWORD_MIN_6");
+  if (!USER_STATUSES.includes(normalizeCode(status))) errors.push("INVALID_STATUS");
+  if (await User.exists({ username, is_deleted: false })) errors.push("USERNAME_EXISTS");
+  if (!(await Role.exists({ _id: role_id, is_deleted: false }))) errors.push("ROLE_NOT_FOUND");
+  if (errors.length) return errorResponse(res, "Dữ liệu không hợp lệ", errors, 400);
 
-export const updateUser = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { username, password_hash, role_id, status, is_deleted } = req.body;
-    const updatedUser = await User.findByIdAndUpdate(
-      id,
-      {
-        username,
-        password_hash,
-        role_id,
-        status,
-        is_deleted
-      },
-      { returnDocument: "after" }
-    );
+  const password_hash = await hashPassword(password);
+  const user = await User.create({
+    username,
+    password_hash,
+    role_id,
+    status: normalizeCode(status),
+  });
+  return successResponse(res, user, "Tạo người dùng thành công", 201);
+});
 
-    if (!updatedUser) {
-      return res.status(404).json({
-        success: false,
-        message: "Người dùng không tồn tại",
-      });
+export const updateUser = asyncHandler(async (req, res) => {
+  const updates = {};
+  if (req.body.role_id) {
+    if (!(await Role.exists({ _id: req.body.role_id, is_deleted: false }))) {
+      return errorResponse(res, "Dữ liệu không hợp lệ", ["ROLE_NOT_FOUND"], 400);
     }
-
-    res.status(200).json(updatedUser);
-
-  } catch (error) {
-    console.log("Lỗi cập nhật người dùng:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi cập nhật người dùng",
-      error: error.message,
-    });
+    updates.role_id = req.body.role_id;
   }
-};
-
-export const deleteUser = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const deletedUser = await User.findByIdAndDelete(id);
-    if (!deletedUser) {
-      return res.status(404).json({
-        success: false,
-        message: "Người dùng không tồn tại",
-      });
+  if (req.body.status) {
+    const status = normalizeCode(req.body.status);
+    if (!USER_STATUSES.includes(status)) {
+      return errorResponse(res, "Dữ liệu không hợp lệ", ["INVALID_STATUS"], 400);
     }
-
-    res.status(200).json({
-      success: true,
-      message: "Người dùng đã được xóa",
-    });
-  } catch (error) {
-    console.log("Lỗi xóa người dùng:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi xóa người dùng",
-      error: error.message,
-    });
+    updates.status = status;
   }
-};
+
+  const user = await User.findOneAndUpdate(
+    { _id: req.params.id, is_deleted: false },
+    updates,
+    { new: true },
+  ).populate("role_id");
+  if (!user) return errorResponse(res, "Người dùng không tồn tại", ["USER_NOT_FOUND"], 404);
+  return successResponse(res, user);
+});
+
+export const deleteUser = asyncHandler(async (req, res) => {
+  const user = await User.findOneAndUpdate(
+    { _id: req.params.id, is_deleted: false },
+    { is_deleted: true },
+    { new: true },
+  );
+  if (!user) return errorResponse(res, "Người dùng không tồn tại", ["USER_NOT_FOUND"], 404);
+  return successResponse(res, user, "Người dùng đã được xóa");
+});

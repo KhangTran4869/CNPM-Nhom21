@@ -1,11 +1,20 @@
 import express from "express";
-import { createAssignment, getAllAssignments, updateAssignment, deleteAssignment } from "../controllers/assignmentsControllers.js";
+import { createAssignment, getAllAssignments, updateAssignment, deleteAssignment, approve, reject, propose, changeLecturerController, check } from "../controllers/assignmentsControllers.js";
+import { getAllAssignmentsHistory } from "../controllers/assignmentHistoryController.js";
+import { authenticate, authorize } from "../middlewares/auth.js";
 
 const routes = express.Router();
 
-routes.get("/", getAllAssignments);
-routes.post("/", createAssignment);
-routes.put("/:id", updateAssignment);
-routes.delete("/:id", deleteAssignment);
+routes.use(authenticate);
+routes.get("/", authorize("ADMIN", "HEAD", "LECTURER"), getAllAssignments);
+routes.post("/propose", authorize("ADMIN", "HEAD"), propose);
+routes.post("/check", authorize("ADMIN", "HEAD"), check);
+routes.post("/", authorize("ADMIN"), createAssignment);
+routes.patch("/:id/approve", authorize("ADMIN"), approve);
+routes.patch("/:id/reject", authorize("ADMIN"), reject);
+routes.patch("/:id/change-lecturer", authorize("ADMIN"), changeLecturerController);
+routes.get("/:assignment_id/history", authorize("ADMIN", "HEAD"), getAllAssignmentsHistory);
+routes.put("/:id", authorize("ADMIN"), updateAssignment);
+routes.delete("/:id", authorize("ADMIN"), deleteAssignment);
 
 export default routes;

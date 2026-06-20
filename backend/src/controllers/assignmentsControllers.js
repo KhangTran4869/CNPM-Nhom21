@@ -1,100 +1,99 @@
-import Assignment from "../models/Assignment.js"; 
+import Assignment from "../models/Assignment.js";
+import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
+import { normalizeCode } from "../utils/constants.js";
+import {
+  approveAssignment,
+  changeLecturer,
+  createAssignmentDirect,
+  proposeAssignment,
+  rejectAssignment,
+  softDeleteAssignment,
+} from "../services/assignmentService.js";
+import { checkAssignmentEligibility } from "../services/conflictService.js";
 
-export const getAllAssignments = async (req, res) => {
-    try{
-        const assignments = await Assignment.find().sort({ createdAt: 'desc' }); 
-        res.status(200).json(assignments);
-    }catch(error){
-        console.log("Lỗi lấy danh sách nhiệm vụ:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi lấy danh sách nhiệm vụ",
-      error: error.message,
-    });
+export const getAllAssignments = asyncHandler(async (req, res) => {
+  const filter = { is_deleted: false };
+  for (const key of ["lecturer_id", "class_id"]) {
+    if (req.query[key]) filter[key] = req.query[key];
   }
-};
+  if (req.query.status) filter.status = normalizeCode(req.query.status);
+  if (req.userRole === "LECTURER") filter.lecturer_id = req.lecturer?._id;
 
-export const createAssignment = async (req, res) => {
-  try {
-    const { class_id, lecturer_id, status, assignment_by, note } = req.body;
+  let query = Assignment.find(filter)
+    .populate({
+      path: "class_id",
+      populate: [{ path: "course_id" }, { path: "semester_id" }],
+    })
+    .populate({ path: "lecturer_id", populate: "department_id" })
+    .populate("assigned_by")
+    .sort({ createdAt: "desc" });
 
-    const newAssignment = new Assignment({
-      class_id,
-      lecturer_id,
-      status,
-      assignment_by,
-      note
-    });
-    const savedAssignment = await newAssignment.save(); 
-    res.status(201).json(savedAssignment);
-  } catch (error) {
-    console.log("Lỗi thêm nhiệm vụ:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi thêm nhiệm vụ",
-      error: error.message,
-    });
-  }
-};
-
-export const updateAssignment = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { class_id, lecturer_id, status, assignment_by, note, is_deleted } = req.body;
-    const updatedAssignment = await Assignment.findByIdAndUpdate(
-      id,
-      {
-        class_id,
-        lecturer_id,
-        status,
-        assignment_by,
-        note, 
-        is_deleted
-      },
-      { returnDocument: "after" }
+  let assignments = await query;
+  if (req.query.semester_id) {
+    assignments = assignments.filter(
+      (item) =>
+        String(item.class_id?.semester_id?._id || item.class_id?.semester_id) ===
+        String(req.query.semester_id),
     );
-
-    if (!updatedAssignment) {
-      return res.status(404).json({
-        success: false,
-        message: "Nhiệm vụ không tồn tại",
-      });
-    }
-
-    res.status(200).json(updatedAssignment);
-
-  } catch (error) {
-    console.log("Lỗi cập nhật nhiệm vụ:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi cập nhật nhiệm vụ",
-      error: error.message,
-    });
   }
-};
-
-export const deleteAssignment = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const deletedAssignment = await Assignment.findByIdAndDelete(id);
-    if (!deletedAssignment) {
-      return res.status(404).json({
-        success: false,
-        message: "Nhiệm vụ không tồn tại",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Nhiệm vụ đã được xóa",
-    });
-  } catch (error) {
-    console.log("Lỗi xóa nhiệm vụ:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi xóa nhiệm vụ",
-      error: error.message,
-    });
+  if (req.query.department_id) {
+    assignments = assignments.filter(
+      (item) =>
+        String(item.lecturer_id?.department_id?._id || item.lecturer_id?.department_id) ===
+          String(req.query.department_id) ||
+        String(item.class_id?.course_id?.department_id?._id || item.class_id?.course_id?.department_id) ===
+          String(req.query.department_id),
+    );
   }
-};
+  return successResponse(res, assignments);
+});
+
+export const createAssignment = asyncHandler(async (req, res) => {
+  const assignment = await createAssignmentDirect({ ...req.body, user: req.user });
+  return successResponse(res, assignment, "Tạo phân công thành công", 201);
+});
+
+export const propose = asyncHandler(async (req, res) => {
+  const assignment = await proposeAssignment({ ...req.body, user: req.user });
+  return successResponse(res, assignment, "Đề xuất phân công thành công", 201);
+});
+
+export const check = asyncHandler(async (req, res) => {
+  const result = await checkAssignmentEligibility({
+    classId: req.body.class_id,
+    lecturerId: req.body.lecturer_id,
+  });
+  return successResponse(
+    res,
+    { is_valid: result.is_valid, violations: result.violations },
+    result.is_valid ? "Giảng viên phù hợp để phân công" : "Giảng viên không phù hợp để phân công",
+  );
+});
+
+export const approve = asyncHandler(async (req, res) => {
+  const assignment = await approveAssignment({ id: req.params.id, note: req.body.note });
+  return successResponse(res, assignment, "Duyệt phân công thành công");
+});
+
+export const reject = asyncHandler(async (req, res) => {
+  const assignment = await rejectAssignment({ id: req.params.id, note: req.body.note });
+  return successResponse(res, assignment, "Từ chối phân công thành công");
+});
+
+export const changeLecturerController = asyncHandler(async (req, res) => {
+  const assignment = await changeLecturer({
+    id: req.params.id,
+    new_lecturer_id: req.body.new_lecturer_id,
+    note: req.body.note,
+  });
+  return successResponse(res, assignment, "Đổi giảng viên thành công");
+});
+
+export const updateAssignment = asyncHandler(async (_req, res) => {
+  return errorResponse(res, "Không cho sửa trực tiếp phân công", ["ASSIGNMENT_LOCKED"], 409);
+});
+
+export const deleteAssignment = asyncHandler(async (req, res) => {
+  const assignment = await softDeleteAssignment(req.params.id);
+  return successResponse(res, assignment, "Phân công đã được xóa");
+});

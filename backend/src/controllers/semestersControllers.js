@@ -1,96 +1,34 @@
-import Semester from "../models/Semester.js"; 
+import Semester from "../models/Semester.js";
+import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
 
-export const getAllSemesters = async (req, res) => {
-    try{
-        const semesters = await Semester.find().sort({ createdAt: 'desc' }); 
-        res.status(200).json(semesters);
-    }catch(error){
-        console.log("Lỗi lấy danh sách học kỳ:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi lấy danh sách học kỳ",
-      error: error.message,
-    });
-  }
-};
+export const getAllSemesters = asyncHandler(async (_req, res) => {
+  const semesters = await Semester.find({ is_deleted: false }).sort({ createdAt: "desc" });
+  return successResponse(res, semesters);
+});
 
-export const createSemester = async (req, res) => {
-  try {
-    const { name, start_date, end_date } = req.body;
+export const createSemester = asyncHandler(async (req, res) => {
+  const { name, start_date, end_date } = req.body;
+  if (!name) return errorResponse(res, "Dữ liệu không hợp lệ", ["NAME_REQUIRED"], 400);
+  const semester = await Semester.create({ name, start_date, end_date });
+  return successResponse(res, semester, "Tạo học kỳ thành công", 201);
+});
 
-    const newSemester = new Semester({
-        name,
-        start_date,
-        end_date
-    });
-    const savedSemester = await newSemester.save(); 
-    res.status(201).json(savedSemester);
-  } catch (error) {
-    console.log("Lỗi thêm học kỳ:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi thêm học kỳ",
-      error: error.message,
-    });
-  }
-};
+export const updateSemester = asyncHandler(async (req, res) => {
+  const semester = await Semester.findOneAndUpdate(
+    { _id: req.params.id, is_deleted: false },
+    req.body,
+    { new: true },
+  );
+  if (!semester) return errorResponse(res, "Học kỳ không tồn tại", ["SEMESTER_NOT_FOUND"], 404);
+  return successResponse(res, semester);
+});
 
-export const updateSemester = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, start_date, end_date, is_deleted } = req.body;
-    const updatedSemester = await Semester.findByIdAndUpdate(
-      id,
-      {
-        name,
-        start_date,
-        end_date,
-        is_deleted
-      },
-      { returnDocument: "after" }
-    );
-
-    if (!updatedSemester) {
-      return res.status(404).json({
-        success: false,
-        message: "Học kỳ không tồn tại",
-      });
-    }
-
-    res.status(200).json(updatedSemester);
-  } catch (error) {
-    console.log("Lỗi cập nhật học kỳ:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi cập nhật học kỳ",
-      error: error.message,
-    });
-  }
-};
-
-export const deleteSemester = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const deletedSemester = await Semester.findByIdAndDelete(id);
-    if (!deletedSemester) {
-      return res.status(404).json({
-        success: false,
-        message: "Học kỳ không tồn tại",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Học kỳ đã được xóa",
-    });
-  } catch (error) {
-    console.log("Lỗi xóa học kỳ:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi xóa học kỳ",
-      error: error.message,
-    });
-  }
-};
-       
+export const deleteSemester = asyncHandler(async (req, res) => {
+  const semester = await Semester.findOneAndUpdate(
+    { _id: req.params.id, is_deleted: false },
+    { is_deleted: true },
+    { new: true },
+  );
+  if (!semester) return errorResponse(res, "Học kỳ không tồn tại", ["SEMESTER_NOT_FOUND"], 404);
+  return successResponse(res, semester, "Học kỳ đã được xóa");
+});

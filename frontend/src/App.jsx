@@ -1,122 +1,135 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect, useMemo, useState } from "react";
+import "./App.css";
+import "./styles/uis-theme.css";
+import { AppLayout } from "./components/layout/AppLayout";
+import { authService } from "./services/authService";
+import { tokenStore } from "./services/api";
+import { LoginPage } from "./pages/LoginPage";
+import { HomePage } from "./pages/HomePage";
+import { WeeklySchedulePage } from "./pages/WeeklySchedulePage";
+import { LecturersPage } from "./pages/LecturersPage";
+import { ClassesPage } from "./pages/ClassesPage";
+import { AssignmentsPage } from "./pages/AssignmentsPage";
+import { AvailabilityPage } from "./pages/AvailabilityPage";
+import { ReportsPage } from "./pages/ReportsPage";
+import { ComingSoonPage, ForbiddenPage, SimpleResourcePage } from "./pages/SimpleResourcePage";
 
-function App() {
-  const [count, setCount] = useState(0)
+const routeRoles = {
+  "/home": ["ADMIN", "HEAD", "LECTURER"],
+  "/teaching-schedule/weekly": ["LECTURER", "ADMIN", "HEAD"],
+  "/teaching-schedule/semester": ["LECTURER", "ADMIN", "HEAD"],
+  "/lecturers": ["ADMIN", "HEAD"],
+  "/classes": ["ADMIN", "HEAD", "LECTURER"],
+  "/assignments": ["ADMIN", "HEAD", "LECTURER"],
+  "/availability": ["ADMIN", "LECTURER"],
+  "/reports": ["ADMIN", "HEAD", "LECTURER"],
+  "/users": ["ADMIN"],
+  "/courses": ["ADMIN"],
+  "/semesters": ["ADMIN"],
+  "/rooms": ["ADMIN"],
+  "/assignment-history": ["ADMIN", "HEAD"],
+  "/notifications": ["ADMIN", "HEAD", "LECTURER"],
+  "/profile": ["LECTURER"],
+};
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+function currentPath() {
+  const path = window.location.pathname;
+  return path === "/" ? "/home" : path;
 }
 
-export default App
+function App() {
+  const [path, setPath] = useState(currentPath());
+  const [user, setUser] = useState(null);
+  const [booting, setBooting] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
+
+  const navigate = (nextPath) => {
+    window.history.pushState({}, "", nextPath);
+    setPath(nextPath);
+  };
+
+  useEffect(() => {
+    const pop = () => setPath(currentPath());
+    const expired = () => {
+      setUser(null);
+      navigate("/login");
+    };
+    window.addEventListener("popstate", pop);
+    window.addEventListener("auth:expired", expired);
+    return () => {
+      window.removeEventListener("popstate", pop);
+      window.removeEventListener("auth:expired", expired);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!tokenStore.get()) {
+      setBooting(false);
+      if (currentPath() !== "/login") navigate("/login");
+      return;
+    }
+    authService
+      .getMe()
+      .then((me) => {
+        setUser(me);
+        if (currentPath() === "/login") navigate("/home");
+      })
+      .catch(() => {
+        tokenStore.clear();
+        navigate("/login");
+      })
+      .finally(() => setBooting(false));
+  }, []);
+
+  const page = useMemo(() => {
+    if (!user && path !== "/login") return null;
+    const allowed = routeRoles[path];
+    if (allowed && !allowed.includes(user?.role)) return <ForbiddenPage />;
+
+    if (path === "/home") return <HomePage user={user} />;
+    if (path === "/teaching-schedule/weekly") return <WeeklySchedulePage user={user} />;
+    if (path === "/teaching-schedule/semester") return <ComingSoonPage title="Thời khóa biểu dạng học kỳ" />;
+    if (path === "/lecturers") return <LecturersPage user={user} />;
+    if (path === "/classes") return <ClassesPage user={user} />;
+    if (path === "/assignments") return <AssignmentsPage user={user} />;
+    if (path === "/availability") return <AvailabilityPage user={user} />;
+    if (path === "/reports") return <ReportsPage user={user} />;
+    if (path === "/users") return <SimpleResourcePage type="users" />;
+    if (path === "/courses") return <SimpleResourcePage type="courses" />;
+    if (path === "/semesters") return <SimpleResourcePage type="semesters" />;
+    if (path === "/rooms") return <SimpleResourcePage type="rooms" />;
+    if (path === "/assignment-history") return <SimpleResourcePage type="history" />;
+    if (path === "/notifications") return <ComingSoonPage title="Thông báo từ ban quản trị" />;
+    if (path === "/profile") return <ComingSoonPage title="Cập nhật thông tin cá nhân" />;
+    return <HomePage user={user} />;
+  }, [path, user]);
+
+  const onLogin = (nextUser) => {
+    setUser(nextUser);
+    navigate("/home");
+  };
+
+  const onLogout = () => {
+    authService.logout();
+    setUser(null);
+    navigate("/login");
+  };
+
+  if (booting) return <div className="boot-screen">Đang khởi động giao diện...</div>;
+  if (path === "/login" || !user) return <LoginPage onLogin={onLogin} />;
+
+  return (
+    <AppLayout
+      user={user}
+      path={path}
+      collapsed={collapsed}
+      onMenu={() => setCollapsed((value) => !value)}
+      onLogout={onLogout}
+      navigate={navigate}
+    >
+      {page}
+    </AppLayout>
+  );
+}
+
+export default App;
