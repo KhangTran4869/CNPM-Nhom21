@@ -34,7 +34,7 @@ const lecturerSchema = new mongoose.Schema(
       default: null,
     },
 
-    department: {
+    department_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Department",
       default: null,

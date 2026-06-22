@@ -16,13 +16,13 @@ export const getAllAssignments = async (req, res) => {
 
 export const createAssignment = async (req, res) => {
   try {
-    const { class_id, lecturer_id, status, assignment_by, note } = req.body;
+    const { class_id, lecturer_id, status, assigned_by, note } = req.body;
 
     const newAssignment = new Assignment({
       class_id,
       lecturer_id,
       status,
-      assignment_by,
+      assigned_by,
       note
     });
     const savedAssignment = await newAssignment.save(); 
