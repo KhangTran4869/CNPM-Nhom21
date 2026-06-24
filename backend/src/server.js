@@ -17,6 +17,7 @@ import coursesRouters from "./routes/CoursesRouters.js";
 import reportsRouters from "./routes/reportsRouters.js";
 import teachingRouters from "./routes/teachingRouters.js";
 import { errorResponse } from "./utils/apiResponse.js";
+import { ensureDefaultAdmin, ensureDefaultDepartments } from "./bootstrap/defaultAdmin.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -59,7 +60,9 @@ app.use((error, _req, res, _next) => {
   );
 });
 
-connectDB().then(() => {
+connectDB().then(async () => {
+  await ensureDefaultAdmin();
+  await ensureDefaultDepartments();
   app.listen(PORT, () => {
     console.log(`Server đang chạy ở cổng ${PORT}`);
   });

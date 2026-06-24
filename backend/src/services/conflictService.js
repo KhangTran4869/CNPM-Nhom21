@@ -98,11 +98,12 @@ export const checkLecturerScheduleConflict = async (
 };
 
 export const checkLecturerBusy = async (lecturerId, classSchedules) => {
-  const busyItems = await LecturerAvailability.find({
+  const availabilityItems = await LecturerAvailability.find({
     lecturer_id: lecturerId,
-    status: "BUSY",
     is_deleted: false,
   });
+  const busyItems = availabilityItems.filter((item) => item.status === "BUSY");
+  const freeItems = availabilityItems.filter((item) => item.status === "FREE");
   const conflicts = [];
 
   for (const incoming of classSchedules) {
@@ -122,6 +123,22 @@ export const checkLecturerBusy = async (lecturerId, classSchedules) => {
           meta: { availability_id: busy._id },
         });
       }
+    }
+
+    if (
+      freeItems.length &&
+      !freeItems.some(
+        (free) =>
+          Number(incoming.day_of_week) === Number(free.day_of_week) &&
+          Number(free.start_period) <= Number(incoming.start_period) &&
+          Number(free.end_period) >= Number(incoming.end_period),
+      )
+    ) {
+      conflicts.push({
+        rule: "LECTURER_NOT_AVAILABLE",
+        message: "Giảng viên không khai báo rảnh trong khung giờ của lớp",
+        meta: { schedule_id: incoming._id },
+      });
     }
   }
 
@@ -234,6 +251,19 @@ export const checkAssignmentEligibility = async ({
   if (requireClassOpen && classDoc.status !== "OPEN") {
     violations.push({ rule: "INVALID_STATUS_TRANSITION", message: "Lớp tín chỉ không ở trạng thái OPEN" });
   }
+  const existingApproved = await Assignment.findOne({
+    class_id: classDoc._id,
+    status: "APPROVED",
+    is_deleted: false,
+    ...(excludeAssignmentId ? { _id: { $ne: excludeAssignmentId } } : {}),
+  });
+  if (existingApproved) {
+    violations.push({
+      rule: "CLASS_ALREADY_ASSIGNED",
+      message: "Lớp đã được phân công cho giảng viên khác",
+      meta: { assignment_id: existingApproved._id },
+    });
+  }
   if (lecturer.status !== "ACTIVE") {
     violations.push({ rule: "INVALID_STATUS_TRANSITION", message: "Giảng viên không ở trạng thái ACTIVE" });
   }
@@ -263,6 +293,11 @@ export const checkAssignmentEligibility = async ({
 export const getSuggestedLecturers = async (classId) => {
   const classDoc = await Class.findOne({ _id: classId, is_deleted: false }).populate("course_id");
   if (!classDoc) return null;
+  const existingAssignment = await Assignment.findOne({
+    class_id: classDoc._id,
+    status: "APPROVED",
+    is_deleted: false,
+  });
 
   const filter = { status: "ACTIVE", is_deleted: false };
   if (classDoc.course_id?.department_id) {
@@ -276,8 +311,11 @@ export const getSuggestedLecturers = async (classId) => {
     const eligibility = await checkAssignmentEligibility({
       classId,
       lecturerId: lecturer._id,
+      excludeAssignmentId: existingAssignment?._id,
+      requireClassOpen: !existingAssignment,
     });
     const currentHours = await getCurrentHours(lecturer._id, classDoc.semester_id);
+    if (!eligibility.is_valid) continue;
     suggestions.push({
       lecturer_id: lecturer._id,
       code: lecturer.code,
@@ -287,13 +325,11 @@ export const getSuggestedLecturers = async (classId) => {
       current_hours: currentHours,
       max_hours: lecturer.max_hours,
       available_hours: Number(lecturer.max_hours || 0) - currentHours,
-      is_valid: eligibility.is_valid,
-      reasons: eligibility.is_valid
-        ? ["Đúng bộ môn", "Không trùng lịch", "Không vượt định mức giờ dạy"]
-        : eligibility.violations.map((item) => item.message),
+      is_valid: true,
+      reasons: ["Đúng bộ môn", "Không trùng lịch", "Không vượt định mức giờ dạy"],
       violations: eligibility.violations,
     });
   }
 
-  return suggestions;
+  return suggestions.sort((a, b) => a.current_hours - b.current_hours);
 };

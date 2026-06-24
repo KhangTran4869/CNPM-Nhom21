@@ -1,10 +1,50 @@
 import Assignment from "../models/Assignment.js";
+import Department from "../models/Department.js";
 import Lecturer from "../models/Lecturer.js";
+import Role from "../models/Role.js";
+import User from "../models/User.js";
+import mongoose from "mongoose";
 import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
 import { LECTURER_STATUSES, normalizeCode } from "../utils/constants.js";
+import { hashPassword } from "../utils/password.js";
 import { getCurrentHours } from "../services/conflictService.js";
 
 const ownLecturer = (req, id) => req.lecturer && String(req.lecturer._id) === String(id);
+
+const ensureLecturerUser = async ({ code, user_id }) => {
+  if (user_id) {
+    const user = await User.findOne({ _id: user_id, is_deleted: false }).populate("role_id");
+    if (!user) return { error: "USER_NOT_FOUND" };
+    const linked = await Lecturer.exists({ user_id: user._id, is_deleted: false });
+    if (linked) return { error: "USER_ALREADY_LINKED" };
+    return { user };
+  }
+
+  const lecturerRole = await Role.findOneAndUpdate(
+    { code: "LECTURER" },
+    { code: "LECTURER", name: "Giảng viên", is_deleted: false },
+    { upsert: true, new: true },
+  );
+  const username = String(code).trim().toLowerCase();
+  const existing = await User.findOne({ username, is_deleted: false });
+
+  if (existing) {
+    const linked = await Lecturer.exists({ user_id: existing._id, is_deleted: false });
+    if (linked) return { error: "USER_ALREADY_LINKED" };
+    existing.role_id = lecturerRole._id;
+    existing.status = "ACTIVE";
+    await existing.save();
+    return { user: existing };
+  }
+
+  const user = await User.create({
+    username,
+    password_hash: await hashPassword("123456"),
+    role_id: lecturerRole._id,
+    status: "ACTIVE",
+  });
+  return { user };
+};
 
 export const getAllLecturers = asyncHandler(async (req, res) => {
   const filter = { is_deleted: false };
@@ -29,9 +69,23 @@ export const getAllLecturers = asyncHandler(async (req, res) => {
 
 export const createLecturer = asyncHandler(async (req, res) => {
   const { code, name, email, phone, degree, department_id, user_id, max_hours, status = "ACTIVE" } = req.body;
-  if (!code || !name || !LECTURER_STATUSES.includes(normalizeCode(status))) {
-    return errorResponse(res, "Dữ liệu không hợp lệ", ["CODE_NAME_STATUS_REQUIRED"], 400);
+  const errors = [];
+  if (!code) errors.push("CODE_REQUIRED");
+  if (!name) errors.push("NAME_REQUIRED");
+  if (!LECTURER_STATUSES.includes(normalizeCode(status))) errors.push("INVALID_STATUS");
+  if (!department_id) errors.push("DEPARTMENT_REQUIRED");
+  if (department_id && !mongoose.isValidObjectId(department_id)) errors.push("DEPARTMENT_ID_INVALID");
+  if (user_id && !mongoose.isValidObjectId(user_id)) errors.push("USER_ID_INVALID");
+  if (await Lecturer.exists({ code, is_deleted: false })) errors.push("LECTURER_CODE_EXISTS");
+  if (errors.length) {
+    return errorResponse(res, "Dữ liệu không hợp lệ", errors, 400);
   }
+
+  const department = await Department.findOne({ _id: department_id, is_deleted: false });
+  if (!department) return errorResponse(res, "Bộ môn không tồn tại", ["DEPARTMENT_NOT_FOUND"], 400);
+  const account = await ensureLecturerUser({ code, user_id });
+  if (account.error) return errorResponse(res, "Dữ liệu không hợp lệ", [account.error], 400);
+
   const lecturer = await Lecturer.create({
     code,
     name,
@@ -39,11 +93,12 @@ export const createLecturer = asyncHandler(async (req, res) => {
     phone,
     degree,
     department_id,
-    user_id,
+    user_id: account.user._id,
     max_hours,
     status: normalizeCode(status),
   });
-  return successResponse(res, lecturer, "Tạo giảng viên thành công", 201);
+  const populated = await lecturer.populate("department_id user_id");
+  return successResponse(res, populated, "Tạo giảng viên thành công", 201);
 });
 
 export const updateLecturer = asyncHandler(async (req, res) => {
@@ -58,7 +113,13 @@ export const updateLecturer = asyncHandler(async (req, res) => {
 
   const updates = {};
   for (const key of allowed) {
-    if (req.body[key] !== undefined) updates[key] = req.body[key];
+    if (req.body[key] !== undefined && req.body[key] !== "") updates[key] = req.body[key];
+  }
+  if (updates.department_id && !mongoose.isValidObjectId(updates.department_id)) {
+    return errorResponse(res, "Dữ liệu không hợp lệ", ["DEPARTMENT_ID_INVALID"], 400);
+  }
+  if (updates.user_id && !mongoose.isValidObjectId(updates.user_id)) {
+    return errorResponse(res, "Dữ liệu không hợp lệ", ["USER_ID_INVALID"], 400);
   }
   if (updates.status) updates.status = normalizeCode(updates.status);
 

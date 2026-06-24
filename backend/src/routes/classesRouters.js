@@ -13,6 +13,7 @@ routes.patch("/:id/status", authorize("ADMIN"), updateClassStatus);
 routes.delete("/:id", authorize("ADMIN"), deleteClass);
 routes.get("/:class_id/schedules", authorize("ADMIN", "HEAD", "LECTURER"), getAllSchedules);
 routes.post("/:class_id/schedules", authorize("ADMIN"), createSchedule);
+routes.get("/:class_id/suggest-lecturers", authorize("ADMIN", "HEAD"), getSuggestedLecturersByClass);
 routes.get("/:class_id/suggested-lecturers", authorize("ADMIN", "HEAD"), getSuggestedLecturersByClass);
 
 export default routes;

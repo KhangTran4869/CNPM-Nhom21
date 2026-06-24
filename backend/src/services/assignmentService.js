@@ -2,6 +2,7 @@ import Assignment from "../models/Assignment.js";
 import AssignmentHistory from "../models/AssignmentHistory.js";
 import Class from "../models/Class.js";
 import { ApiError } from "../utils/apiResponse.js";
+import { ASSIGNMENT_STATUSES } from "../utils/constants.js";
 import { checkAssignmentEligibility } from "./conflictService.js";
 
 const findAssignment = async (id) => {
@@ -40,14 +41,15 @@ export const proposeAssignment = async ({ class_id, lecturer_id, note, user }) =
 export const createAssignmentDirect = async ({
   class_id,
   lecturer_id,
-  status = "PENDING",
+  status = "APPROVED",
   note,
   user,
 }) => {
-  const normalizedStatus = String(status || "PENDING").toUpperCase();
-  if (normalizedStatus === "APPROVED") {
-    await assertEligible({ classId: class_id, lecturerId: lecturer_id });
+  const normalizedStatus = String(status || "APPROVED").toUpperCase();
+  if (!ASSIGNMENT_STATUSES.includes(normalizedStatus)) {
+    throw new ApiError("Trạng thái phân công không hợp lệ", 400, ["INVALID_STATUS"]);
   }
+  await assertEligible({ classId: class_id, lecturerId: lecturer_id });
 
   const assignment = await Assignment.create({
     class_id,
@@ -59,6 +61,51 @@ export const createAssignmentDirect = async ({
 
   if (normalizedStatus === "APPROVED") {
     await Class.findByIdAndUpdate(class_id, { status: "ASSIGNED" });
+  }
+
+  return assignment;
+};
+
+export const updateAssignmentRecord = async ({ id, lecturer_id, status, note }) => {
+  const assignment = await findAssignment(id);
+  const updates = {};
+  const nextStatus = status ? statusOf(status) : statusOf(assignment.status);
+
+  if (status && !ASSIGNMENT_STATUSES.includes(nextStatus)) {
+    throw new ApiError("Trạng thái phân công không hợp lệ", 400, ["INVALID_STATUS"]);
+  }
+  if (status) updates.status = nextStatus;
+  if (note !== undefined) updates.note = note;
+
+  if (lecturer_id && String(lecturer_id) !== String(assignment.lecturer_id)) {
+    const oldLecturerId = assignment.lecturer_id;
+    await assertEligible({
+      classId: assignment.class_id,
+      lecturerId: lecturer_id,
+      excludeAssignmentId: assignment._id,
+      requireClassOpen: false,
+    });
+    updates.lecturer_id = lecturer_id;
+    await AssignmentHistory.create({
+      assignment_id: assignment._id,
+      old_lecturer_id: oldLecturerId,
+      new_lecturer_id: lecturer_id,
+      changed_at: new Date(),
+    });
+  } else if (nextStatus === "APPROVED") {
+    await assertEligible({
+      classId: assignment.class_id,
+      lecturerId: assignment.lecturer_id,
+      excludeAssignmentId: assignment._id,
+      requireClassOpen: false,
+    });
+  }
+
+  Object.assign(assignment, updates);
+  await assignment.save();
+
+  if (statusOf(assignment.status) === "APPROVED") {
+    await Class.findByIdAndUpdate(assignment.class_id, { status: "ASSIGNED" });
   }
 
   return assignment;

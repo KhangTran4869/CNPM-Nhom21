@@ -9,9 +9,9 @@ export function Header({ user, onMenu, onLogout }) {
       </div>
       <div className="header-user">
         <span className="bell">🔔</span>
-        <div className="avatar">{user?.username?.slice(0, 1)?.toUpperCase() || "U"}</div>
+        <div className="avatar">{user?.name?.slice(0, 1)?.toUpperCase() || user?.username?.slice(0, 1)?.toUpperCase() || "U"}</div>
         <div className="user-meta">
-          <strong>{user?.username || "Người dùng"}</strong>
+          <strong>{user?.name || user?.username || "Người dùng"}</strong>
           <span>{user?.role || "ROLE"}</span>
         </div>
         <Button variant="ghost-light" onClick={onLogout}>Đăng xuất</Button>

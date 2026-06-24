@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Select } from "../components/ui/Field";
@@ -13,6 +13,14 @@ const days = [
   { key: 7, label: "Thứ 7" },
   { key: 8, label: "Chủ Nhật" },
 ];
+
+const groupOfClass = (classCode) => {
+  const match = String(classCode || "").match(/(\d+)$/);
+  return match ? match[1] : classCode || "N/A";
+};
+
+const courseTitle = (course) =>
+  `${course?.name || "Môn học"}${course?.code ? ` (${course.code})` : ""}`;
 
 export function WeeklySchedulePage({ user }) {
   const [semesters, setSemesters] = useState([]);
@@ -51,14 +59,23 @@ export function WeeklySchedulePage({ user }) {
     items.forEach((assignment) => {
       const cls = assignment.class_id || {};
       (cls.schedules || []).forEach((schedule) => {
-        map[`${schedule.day_of_week}-${schedule.start_period}`] = {
+        const start = Number(schedule.start_period);
+        const end = Number(schedule.end_period);
+        map[`${schedule.day_of_week}-${start}`] = {
           assignment,
           schedule,
+          rowSpan: Math.max(end - start + 1, 1),
         };
       });
     });
     return map;
   }, [items]);
+
+  const isCoveredByPreviousPeriod = (dayKey, period) =>
+    Object.values(cells).some(({ schedule }) => {
+      if (Number(schedule.day_of_week) !== Number(dayKey)) return false;
+      return Number(schedule.start_period) < period && Number(schedule.end_period) >= period;
+    });
 
   return (
     <Card
@@ -85,32 +102,44 @@ export function WeeklySchedulePage({ user }) {
         </label>
       </div>
       {loading && <div className="alert info">Đang tải thời khóa biểu...</div>}
-      <div className="schedule-grid">
-        <div className="schedule-head">Tiết học</div>
-        {days.map((day) => <div className="schedule-head" key={day.key}>{day.label}</div>)}
-        {Array.from({ length: 12 }, (_, i) => i + 1).map((period) => (
-          <Fragment key={period}>
-            <div className="period-cell" key={`p-${period}`}>Tiết {period}</div>
-            {days.map((day) => {
-              const cell = cells[`${day.key}-${period}`];
-              const cls = cell?.assignment?.class_id || {};
-              const course = cls.course_id || {};
-              return (
-                <div className={`schedule-cell ${cell ? "has-class" : ""}`} key={`${day.key}-${period}`}>
-                  {cell && (
-                    <>
-                      <strong>{cls.code}</strong>
-                      <span>{course.name || "Môn học"}</span>
-                      <small>{cell.schedule.room_id?.name || "Phòng"}</small>
-                      {user?.role !== "LECTURER" && <small>{cell.assignment.lecturer_id?.name}</small>}
-                      <em>{cell.assignment.status}</em>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </Fragment>
-        ))}
+      <div className="schedule-table-wrap">
+        <table className="schedule-table">
+          <thead>
+            <tr>
+              <th>Tiết học</th>
+              {days.map((day) => <th key={day.key}>{day.label}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((period) => (
+              <tr key={period}>
+                <th className="period-cell">Tiết {period}</th>
+                {days.map((day) => {
+                  if (isCoveredByPreviousPeriod(day.key, period)) return null;
+                  const cell = cells[`${day.key}-${period}`];
+                  const cls = cell?.assignment?.class_id || {};
+                  const course = cls.course_id || {};
+                  return (
+                    <td
+                      className={`schedule-cell ${cell ? "has-class" : ""}`}
+                      key={`${day.key}-${period}`}
+                      rowSpan={cell?.rowSpan || 1}
+                    >
+                      {cell && (
+                        <div className="schedule-class-block">
+                          <strong>{courseTitle(course)}</strong>
+                          <span>Nhóm: {groupOfClass(cls.code)}</span>
+                          <span>Phòng: {cell.schedule.room_id?.name || "N/A"}</span>
+                          {user?.role !== "LECTURER" && <span>GV: {cell.assignment.lecturer_id?.name || "N/A"}</span>}
+                        </div>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </Card>
   );

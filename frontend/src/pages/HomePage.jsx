@@ -19,18 +19,18 @@ export function HomePage({ user }) {
       </div>
       <Card title="Thông tin người dùng">
         <div className="profile-grid">
-          <div className="profile-avatar">{user?.username?.slice(0, 1)?.toUpperCase()}</div>
+          <div className="profile-avatar">{user?.name?.slice(0, 1)?.toUpperCase() || user?.username?.slice(0, 1)?.toUpperCase()}</div>
           <Info label="Mã người dùng" value={user?.id} />
+          <Info label="Tài khoản" value={user?.username} />
+          <Info label="Mã giảng viên" value={user?.code} />
           <Info label="Họ tên" value={user?.name || user?.username} />
-          <Info label="Ngày sinh" value={user?.birthday} />
-          <Info label="Giới tính" value={user?.gender} />
-          <Info label="Trạng thái" value={<Badge>{user?.status}</Badge>} />
+          <Info label="Trạng thái tài khoản" value={<Badge>{user?.status}</Badge>} />
           <Info label="Số điện thoại" value={user?.phone} />
           <Info label="Email" value={user?.email} />
           <Info label="Bộ môn" value={user?.department} />
           <Info label="Học vị" value={user?.degree} />
+          <Info label="Định mức giờ" value={user?.max_hours} />
           <Info label="Vai trò" value={<Badge>{user?.role}</Badge>} />
-          <Info label="Địa chỉ" value={user?.address} />
         </div>
       </Card>
     </div>

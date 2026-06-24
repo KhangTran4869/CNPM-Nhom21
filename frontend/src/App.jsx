@@ -12,6 +12,7 @@ import { ClassesPage } from "./pages/ClassesPage";
 import { AssignmentsPage } from "./pages/AssignmentsPage";
 import { AvailabilityPage } from "./pages/AvailabilityPage";
 import { ReportsPage } from "./pages/ReportsPage";
+import { ProfilePage } from "./pages/ProfilePage";
 import { ComingSoonPage, ForbiddenPage, SimpleResourcePage } from "./pages/SimpleResourcePage";
 
 const routeRoles = {
@@ -100,7 +101,7 @@ function App() {
     if (path === "/rooms") return <SimpleResourcePage type="rooms" />;
     if (path === "/assignment-history") return <SimpleResourcePage type="history" />;
     if (path === "/notifications") return <ComingSoonPage title="Thông báo từ ban quản trị" />;
-    if (path === "/profile") return <ComingSoonPage title="Cập nhật thông tin cá nhân" />;
+    if (path === "/profile") return <ProfilePage user={user} onUserChange={setUser} />;
     return <HomePage user={user} />;
   }, [path, user]);
 

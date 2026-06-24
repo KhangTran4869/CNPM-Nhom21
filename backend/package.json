@@ -8,6 +8,7 @@
     "start": "node ./src/server.js",
     "seed:admin": "node ./src/seedAdmin.js",
     "seed:lecturer": "node ./src/seedLecturer.js",
+    "seed:assignment-data": "node ./src/seedAssignmentData.js",
     "test": "node --test"
   },
   "keywords": [],

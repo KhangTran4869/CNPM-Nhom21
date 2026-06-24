@@ -1,4 +1,5 @@
 import Assignment from "../models/Assignment.js";
+import mongoose from "mongoose";
 import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
 import { normalizeCode } from "../utils/constants.js";
 import {
@@ -8,6 +9,7 @@ import {
   proposeAssignment,
   rejectAssignment,
   softDeleteAssignment,
+  updateAssignmentRecord,
 } from "../services/assignmentService.js";
 import { checkAssignmentEligibility } from "../services/conflictService.js";
 
@@ -46,6 +48,23 @@ export const getAllAssignments = asyncHandler(async (req, res) => {
     );
   }
   return successResponse(res, assignments);
+});
+
+export const getAssignmentById = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return errorResponse(res, "Không tìm thấy phân công", ["ASSIGNMENT_NOT_FOUND"], 404);
+  }
+  const assignment = await Assignment.findOne({ _id: req.params.id, is_deleted: false })
+    .populate({
+      path: "class_id",
+      populate: [{ path: "course_id" }, { path: "semester_id" }],
+    })
+    .populate({ path: "lecturer_id", populate: "department_id" })
+    .populate("assigned_by");
+  if (!assignment) {
+    return errorResponse(res, "Không tìm thấy phân công", ["ASSIGNMENT_NOT_FOUND"], 404);
+  }
+  return successResponse(res, assignment);
 });
 
 export const createAssignment = asyncHandler(async (req, res) => {
@@ -89,8 +108,14 @@ export const changeLecturerController = asyncHandler(async (req, res) => {
   return successResponse(res, assignment, "Đổi giảng viên thành công");
 });
 
-export const updateAssignment = asyncHandler(async (_req, res) => {
-  return errorResponse(res, "Không cho sửa trực tiếp phân công", ["ASSIGNMENT_LOCKED"], 409);
+export const updateAssignment = asyncHandler(async (req, res) => {
+  const assignment = await updateAssignmentRecord({
+    id: req.params.id,
+    lecturer_id: req.body.lecturer_id || req.body.new_lecturer_id,
+    status: req.body.status,
+    note: req.body.note,
+  });
+  return successResponse(res, assignment, "Cập nhật phân công thành công");
 });
 
 export const deleteAssignment = asyncHandler(async (req, res) => {

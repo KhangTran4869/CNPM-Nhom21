@@ -59,7 +59,7 @@ services:
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules
-    command: sh -c "test -f node_modules/express/package.json || npm ci --no-bin-links --no-audit --fund=false && npm run seed:admin && npm run seed:lecturer"
+    command: sh -c "test -f node_modules/express/package.json || npm ci --no-bin-links --no-audit --fund=false && npm run seed:admin && npm run seed:lecturer && npm run seed:assignment-data"
 
 volumes:
   mongodb_data:
