@@ -6,6 +6,10 @@ import { signToken } from "../utils/jwt.js";
 import { hashPassword, verifyPassword } from "../utils/password.js";
 
 const publicUser = async (user) => {
+  if (user?.populate && !user.role_id?.code) {
+    await user.populate("role_id");
+  }
+
   const lecturer = await Lecturer.findOne({ user_id: user._id, is_deleted: false })
     .populate("department_id")
     .lean();
@@ -72,7 +76,7 @@ export const changePassword = asyncHandler(async (req, res) => {
     return errorResponse(res, "Vui lòng chọn mật khẩu khác mật khẩu mặc định 123456", ["PASSWORD_TOO_SIMPLE"], 400);
   }
 
-  const user = await User.findById(req.user._id);
+  const user = await User.findById(req.user._id).populate("role_id");
   if (!user) return errorResponse(res, "Người dùng không tồn tại", ["USER_NOT_FOUND"], 404);
 
   if (old_password) {

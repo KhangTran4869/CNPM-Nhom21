@@ -3,7 +3,7 @@ import "./App.css";
 import "./styles/uis-theme.css";
 import { AppLayout } from "./components/layout/AppLayout";
 import { authService } from "./services/authService";
-import { api, tokenStore } from "./services/api";
+import { tokenStore } from "./services/api";
 import { LoginPage } from "./pages/LoginPage";
 import { HomePage } from "./pages/HomePage";
 import { WeeklySchedulePage } from "./pages/WeeklySchedulePage";
@@ -13,7 +13,13 @@ import { AssignmentsPage } from "./pages/AssignmentsPage";
 import { AvailabilityPage } from "./pages/AvailabilityPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { ProfilePage } from "./pages/ProfilePage";
-import { ComingSoonPage, ForbiddenPage, SimpleResourcePage } from "./pages/SimpleResourcePage";
+import { ComingSoonPage, ForbiddenPage } from "./pages/SimpleResourcePage";
+import { UsersPage } from "./pages/UsersPage";
+import { DepartmentsPage } from "./pages/DepartmentsPage";
+import { CoursesPage } from "./pages/CoursesPage";
+import { SemestersPage } from "./pages/SemestersPage";
+import { RoomsPage } from "./pages/RoomsPage";
+import { AssignmentHistoryPage } from "./pages/AssignmentHistoryPage";
 import { Modal } from "./components/ui/Modal";
 import { Input } from "./components/ui/Field";
 import { Button } from "./components/ui/Button";
@@ -104,12 +110,12 @@ function App() {
     if (path === "/assignments") return <AssignmentsPage user={user} />;
     if (path === "/availability") return <AvailabilityPage user={user} />;
     if (path === "/reports") return <ReportsPage user={user} />;
-    if (path === "/users") return <SimpleResourcePage type="users" />;
-    if (path === "/departments") return <SimpleResourcePage type="departments" />;
-    if (path === "/courses") return <SimpleResourcePage type="courses" />;
-    if (path === "/semesters") return <SimpleResourcePage type="semesters" />;
-    if (path === "/rooms") return <SimpleResourcePage type="rooms" />;
-    if (path === "/assignment-history") return <SimpleResourcePage type="history" />;
+    if (path === "/users") return <UsersPage />;
+    if (path === "/departments") return <DepartmentsPage />;
+    if (path === "/courses") return <CoursesPage />;
+    if (path === "/semesters") return <SemestersPage />;
+    if (path === "/rooms") return <RoomsPage />;
+    if (path === "/assignment-history") return <AssignmentHistoryPage />;
     if (path === "/notifications") return <ComingSoonPage title="Thông báo từ ban quản trị" />;
     if (path === "/profile") return <ProfilePage user={user} onUserChange={setUser} />;
     return <HomePage user={user} navigate={navigate} />;
@@ -135,10 +141,11 @@ function App() {
     }
     setChangingPass(true);
     try {
-      const updatedUser = await api.post("/change-password", {
+      await authService.changePassword({
         old_password: passForm.old_password || undefined,
         new_password: passForm.new_password,
       });
+      const updatedUser = await authService.getMe();
       setUser(updatedUser);
       setPassForm({ old_password: "", new_password: "", confirm_password: "" });
       alert("Đổi mật khẩu thành công! Bạn có thể tiếp tục sử dụng hệ thống.");

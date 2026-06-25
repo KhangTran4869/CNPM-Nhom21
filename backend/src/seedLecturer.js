@@ -1,5 +1,7 @@
 import dotenv from "dotenv";
 import mongoose from "mongoose";
+import { fileURLToPath } from "url";
+import path from "path";
 import { connectDB } from "./config/db.js";
 import Department from "./models/Department.js";
 import Lecturer from "./models/Lecturer.js";
@@ -7,7 +9,9 @@ import Role from "./models/Role.js";
 import User from "./models/User.js";
 import { hashPassword } from "./utils/password.js";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 await connectDB();
 

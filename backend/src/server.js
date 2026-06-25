@@ -16,11 +16,16 @@ import classesRouters from "./routes/classesRouters.js";
 import coursesRouters from "./routes/CoursesRouters.js";
 import reportsRouters from "./routes/reportsRouters.js";
 import teachingRouters from "./routes/teachingRouters.js";
+import { changePassword } from "./controllers/authController.js";
+import { authenticate, authorize } from "./middlewares/auth.js";
 import { errorResponse } from "./utils/apiResponse.js";
-import { ensureDefaultAdmin, ensureDefaultDepartments } from "./bootstrap/defaultAdmin.js";
 import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import path from "path";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 const PORT = process.env.PORT || 5000;
 const app = express();
 
@@ -29,6 +34,9 @@ app.use(express.json());
 
 const mountApi = (prefix) => {
   app.use(`${prefix}/auth`, authRouters);
+  app.post(`${prefix}/change-password`, authenticate, authorize("ADMIN", "HEAD", "LECTURER"), changePassword);
+  app.put(`${prefix}/change-password`, authenticate, authorize("ADMIN", "HEAD", "LECTURER"), changePassword);
+  app.patch(`${prefix}/change-password`, authenticate, authorize("ADMIN", "HEAD", "LECTURER"), changePassword);
   app.use(`${prefix}/lecturers`, lecturersRouters);
   app.use(`${prefix}/departments`, departmentsRouter);
   app.use(`${prefix}/users`, usersRouters);
@@ -60,9 +68,7 @@ app.use((error, _req, res, _next) => {
   );
 });
 
-connectDB().then(async () => {
-  await ensureDefaultAdmin();
-  await ensureDefaultDepartments();
+connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`Server đang chạy ở cổng ${PORT}`);
   });
