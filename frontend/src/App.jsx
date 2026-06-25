@@ -3,7 +3,7 @@ import "./App.css";
 import "./styles/uis-theme.css";
 import { AppLayout } from "./components/layout/AppLayout";
 import { authService } from "./services/authService";
-import { tokenStore } from "./services/api";
+import { api, tokenStore } from "./services/api";
 import { LoginPage } from "./pages/LoginPage";
 import { HomePage } from "./pages/HomePage";
 import { WeeklySchedulePage } from "./pages/WeeklySchedulePage";
@@ -14,6 +14,9 @@ import { AvailabilityPage } from "./pages/AvailabilityPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ComingSoonPage, ForbiddenPage, SimpleResourcePage } from "./pages/SimpleResourcePage";
+import { Modal } from "./components/ui/Modal";
+import { Input } from "./components/ui/Field";
+import { Button } from "./components/ui/Button";
 
 const routeRoles = {
   "/home": ["ADMIN", "HEAD", "LECTURER"],
@@ -28,9 +31,10 @@ const routeRoles = {
   "/courses": ["ADMIN"],
   "/semesters": ["ADMIN"],
   "/rooms": ["ADMIN"],
+  "/departments": ["ADMIN"],
   "/assignment-history": ["ADMIN", "HEAD"],
   "/notifications": ["ADMIN", "HEAD", "LECTURER"],
-  "/profile": ["LECTURER"],
+  "/profile": ["LECTURER", "HEAD"],
 };
 
 function currentPath() {
@@ -43,6 +47,11 @@ function App() {
   const [user, setUser] = useState(null);
   const [booting, setBooting] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
+
+  // Password forced change state
+  const [passForm, setPassForm] = useState({ old_password: "", new_password: "", confirm_password: "" });
+  const [passError, setPassError] = useState("");
+  const [changingPass, setChangingPass] = useState(false);
 
   const navigate = (nextPath) => {
     window.history.pushState({}, "", nextPath);
@@ -87,7 +96,7 @@ function App() {
     const allowed = routeRoles[path];
     if (allowed && !allowed.includes(user?.role)) return <ForbiddenPage />;
 
-    if (path === "/home") return <HomePage user={user} />;
+    if (path === "/home") return <HomePage user={user} navigate={navigate} />;
     if (path === "/teaching-schedule/weekly") return <WeeklySchedulePage user={user} />;
     if (path === "/teaching-schedule/semester") return <ComingSoonPage title="Thời khóa biểu dạng học kỳ" />;
     if (path === "/lecturers") return <LecturersPage user={user} />;
@@ -96,13 +105,14 @@ function App() {
     if (path === "/availability") return <AvailabilityPage user={user} />;
     if (path === "/reports") return <ReportsPage user={user} />;
     if (path === "/users") return <SimpleResourcePage type="users" />;
+    if (path === "/departments") return <SimpleResourcePage type="departments" />;
     if (path === "/courses") return <SimpleResourcePage type="courses" />;
     if (path === "/semesters") return <SimpleResourcePage type="semesters" />;
     if (path === "/rooms") return <SimpleResourcePage type="rooms" />;
     if (path === "/assignment-history") return <SimpleResourcePage type="history" />;
     if (path === "/notifications") return <ComingSoonPage title="Thông báo từ ban quản trị" />;
     if (path === "/profile") return <ProfilePage user={user} onUserChange={setUser} />;
-    return <HomePage user={user} />;
+    return <HomePage user={user} navigate={navigate} />;
   }, [path, user]);
 
   const onLogin = (nextUser) => {
@@ -114,6 +124,33 @@ function App() {
     authService.logout();
     setUser(null);
     navigate("/login");
+  };
+
+  const submitForceChangePass = async (e) => {
+    e.preventDefault();
+    setPassError("");
+    if (passForm.new_password !== passForm.confirm_password) {
+      setPassError("Mật khẩu xác nhận không khớp");
+      return;
+    }
+    setChangingPass(true);
+    try {
+      const updatedUser = await api.post("/change-password", {
+        old_password: passForm.old_password || undefined,
+        new_password: passForm.new_password,
+      });
+      setUser(updatedUser);
+      setPassForm({ old_password: "", new_password: "", confirm_password: "" });
+      alert("Đổi mật khẩu thành công! Bạn có thể tiếp tục sử dụng hệ thống.");
+    } catch (err) {
+      setPassError(
+        err.payload?.errors?.map((item) => item.message || item).join(", ") ||
+          err.message ||
+          "Không thể đổi mật khẩu",
+      );
+    } finally {
+      setChangingPass(false);
+    }
   };
 
   if (booting) return <div className="boot-screen">Đang khởi động giao diện...</div>;
@@ -129,6 +166,46 @@ function App() {
       navigate={navigate}
     >
       {page}
+
+      {user?.must_change_password && (
+        <Modal title="Yêu cầu đổi mật khẩu lần đầu" onClose={() => {}}>
+          <div style={{ marginBottom: "16px", color: "var(--text-secondary)", fontSize: "14px" }}>
+            Tài khoản của bạn đang sử dụng mật khẩu mặc định (123456). Vì lý do bảo mật, vui lòng đặt lại mật khẩu mới trước khi tiếp tục.
+          </div>
+          <form className="form-grid" onSubmit={submitForceChangePass}>
+            <Input
+              label="Mật khẩu hiện tại (123456)"
+              type="password"
+              value={passForm.old_password}
+              onChange={(e) => setPassForm({ ...passForm, old_password: e.target.value })}
+              required
+              placeholder="Nhập 123456"
+            />
+            <Input
+              label="Mật khẩu mới"
+              type="password"
+              value={passForm.new_password}
+              onChange={(e) => setPassForm({ ...passForm, new_password: e.target.value })}
+              required
+              minLength={6}
+              placeholder="Ít nhất 6 ký tự"
+            />
+            <Input
+              label="Xác nhận mật khẩu mới"
+              type="password"
+              value={passForm.confirm_password}
+              onChange={(e) => setPassForm({ ...passForm, confirm_password: e.target.value })}
+              required
+              minLength={6}
+              placeholder="Nhập lại mật khẩu mới"
+            />
+            {passError && <div className="alert danger">{passError}</div>}
+            <Button className="form-submit" type="submit" disabled={changingPass}>
+              {changingPass ? "Đang đổi mật khẩu..." : "Cập nhật mật khẩu"}
+            </Button>
+          </form>
+        </Modal>
+      )}
     </AppLayout>
   );
 }

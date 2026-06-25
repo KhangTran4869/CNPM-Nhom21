@@ -39,12 +39,20 @@ export const createUser = asyncHandler(async (req, res) => {
     password_hash,
     role_id,
     status: normalizeCode(status),
+    must_change_password: password === "123456",
   });
   return successResponse(res, user, "Tạo người dùng thành công", 201);
 });
 
 export const updateUser = asyncHandler(async (req, res) => {
   const updates = {};
+  if (req.body.password && req.body.password.trim() !== "") {
+    if (req.body.password.length < 6) {
+      return errorResponse(res, "Mật khẩu mới phải có ít nhất 6 ký tự", ["PASSWORD_MIN_6"], 400);
+    }
+    updates.password_hash = await hashPassword(req.body.password);
+    updates.must_change_password = req.body.password === "123456";
+  }
   if (req.body.role_id) {
     if (!(await Role.exists({ _id: req.body.role_id, is_deleted: false }))) {
       return errorResponse(res, "Dữ liệu không hợp lệ", ["ROLE_NOT_FOUND"], 400);

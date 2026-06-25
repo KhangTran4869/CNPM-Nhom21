@@ -5,6 +5,7 @@ import { Card } from "../components/ui/Card";
 import { Input, Select } from "../components/ui/Field";
 import { Modal } from "../components/ui/Modal";
 import { Table } from "../components/ui/Table";
+import { api } from "../services/api";
 import { catalogService } from "../services/catalogService";
 import { lecturerService } from "../services/lecturerService";
 
@@ -14,7 +15,9 @@ const emptyForm = {
   email: "",
   phone: "",
   degree: "",
+  faculty: "Khoa Công nghệ thông tin",
   department_id: "",
+  user_id: "",
   max_hours: 120,
   status: "ACTIVE",
 };
@@ -25,7 +28,9 @@ const toLecturerForm = (lecturer) => ({
   email: lecturer?.email || "",
   phone: lecturer?.phone || "",
   degree: lecturer?.degree || "",
+  faculty: lecturer?.faculty || "Khoa Công nghệ thông tin",
   department_id: lecturer?.department_id?._id || lecturer?.department_id || "",
+  user_id: lecturer?.user_id?._id || lecturer?.user_id || "",
   max_hours: lecturer?.max_hours || 120,
   status: lecturer?.status || "ACTIVE",
 });
@@ -33,6 +38,7 @@ const toLecturerForm = (lecturer) => ({
 export function LecturersPage({ user }) {
   const [lecturers, setLecturers] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [users, setUsers] = useState([]);
   const [filters, setFilters] = useState({ keyword: "", department_id: "", status: "" });
   const [form, setForm] = useState(emptyForm);
   const [selectedLecturer, setSelectedLecturer] = useState(null);
@@ -58,8 +64,13 @@ export function LecturersPage({ user }) {
         return [];
       });
 
+  const loadUsers = () => {
+    api.get("/users").then((data) => setUsers(data || [])).catch(() => setUsers([]));
+  };
+
   useEffect(() => {
     loadDepartments();
+    loadUsers();
   }, []);
 
   useEffect(load, [filters]);
@@ -71,16 +82,20 @@ export function LecturersPage({ user }) {
       setError("Vui lòng chọn bộ môn trước khi lưu");
       return;
     }
+    const payload = { ...form };
+    if (!payload.user_id) delete payload.user_id;
+
     try {
       if (modal === "Sửa giảng viên") {
-        await lecturerService.updateLecturer(selectedLecturer._id, form);
+        await lecturerService.updateLecturer(selectedLecturer._id, payload);
       } else {
-        await lecturerService.createLecturer(form);
+        await lecturerService.createLecturer(payload);
       }
       setModal("");
       setForm(emptyForm);
       setSelectedLecturer(null);
       load();
+      loadUsers();
     } catch (err) {
       setError(
         err.payload?.errors?.map((item) => item.message || item.rule || item).join(", ") ||
@@ -97,6 +112,7 @@ export function LecturersPage({ user }) {
     setForm({
       ...emptyForm,
       department_id: nextDepartments?.[0]?._id || departments[0]?._id || "",
+      user_id: "",
     });
     setModal("Thêm giảng viên");
   };
@@ -128,6 +144,7 @@ export function LecturersPage({ user }) {
     { key: "email", title: "Email" },
     { key: "phone", title: "Số điện thoại" },
     { key: "degree", title: "Học vị" },
+    { key: "faculty", title: "Khoa", render: (row) => row.faculty || "Khoa Công nghệ thông tin" },
     { key: "department", title: "Bộ môn", render: (row) => row.department_id?.name || "Chưa cập nhật" },
     { key: "account", title: "Tài khoản", render: (row) => row.user_id?.username || "Chưa có" },
     { key: "max_hours", title: "Max hours" },
@@ -216,14 +233,21 @@ export function LecturersPage({ user }) {
 
       <Modal title={modal === "Thêm giảng viên" || modal === "Sửa giảng viên" ? modal : ""} onClose={() => setModal("")}>
         <form className="form-grid" onSubmit={submit}>
-          <Input label="Mã GV" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={modal === "Sửa giảng viên"} />
-          <Input label="Họ tên" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <Input label="Mã GV" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={modal === "Sửa giảng viên"} placeholder="VD: GV001 (Để trống sẽ tự tạo)" />
+          <Input label="Họ tên" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <Input label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <Input label="Số điện thoại" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           <Input label="Học vị" value={form.degree} onChange={(e) => setForm({ ...form, degree: e.target.value })} />
+          <Input label="Khoa" value={form.faculty} onChange={(e) => setForm({ ...form, faculty: e.target.value })} placeholder="VD: Khoa Công nghệ thông tin" />
           <Select label="Bộ môn" value={form.department_id} onChange={(e) => setForm({ ...form, department_id: e.target.value })}>
             <option value="">{departments.length ? "Chọn bộ môn" : "Chưa có bộ môn"}</option>
             {departments.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
+          </Select>
+          <Select label="Tài khoản đăng nhập liên kết" value={form.user_id} onChange={(e) => setForm({ ...form, user_id: e.target.value })}>
+            <option value="">Tự động tạo mới (Username = Mã GV, Pass = 123456)</option>
+            {users.filter(u => !u.lecturer_id && u.role !== "ADMIN").map((u) => (
+              <option key={u._id} value={u._id}>{u.username} ({u.role || "USER"})</option>
+            ))}
           </Select>
           <Input label="Max hours" type="number" value={form.max_hours} onChange={(e) => setForm({ ...form, max_hours: Number(e.target.value) })} />
           <Select label="Trạng thái" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>

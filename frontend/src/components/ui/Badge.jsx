@@ -9,6 +9,9 @@ const toneByStatus = {
   FREE: "info",
   OVERLOAD: "danger",
   NORMAL: "success",
+  ADMIN: "danger",
+  HEAD: "warning",
+  LECTURER: "info",
 };
 
 export function Badge({ children }) {

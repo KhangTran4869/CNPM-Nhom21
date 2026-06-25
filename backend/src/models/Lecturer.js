@@ -34,6 +34,12 @@ const lecturerSchema = new mongoose.Schema(
       default: null,
     },
 
+    faculty: {
+      type: String,
+      trim: true,
+      default: "Khoa Công nghệ thông tin",
+    },
+
     department_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Department",

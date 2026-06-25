@@ -42,6 +42,7 @@ const ensureLecturerUser = async ({ code, user_id }) => {
     password_hash: await hashPassword("123456"),
     role_id: lecturerRole._id,
     status: "ACTIVE",
+    must_change_password: true,
   });
   return { user };
 };
@@ -68,9 +69,19 @@ export const getAllLecturers = asyncHandler(async (req, res) => {
 });
 
 export const createLecturer = asyncHandler(async (req, res) => {
-  const { code, name, email, phone, degree, department_id, user_id, max_hours, status = "ACTIVE" } = req.body;
+  let { code, name, email, phone, degree, faculty = "Khoa Công nghệ thông tin", department_id, user_id, max_hours, status = "ACTIVE" } = req.body;
+  if (!code || code.trim() === "") {
+    const count = await Lecturer.countDocuments();
+    let nextNum = count + 1;
+    let autoCode = `GV${String(nextNum).padStart(3, "0")}`;
+    while (await Lecturer.exists({ code: autoCode })) {
+      nextNum++;
+      autoCode = `GV${String(nextNum).padStart(3, "0")}`;
+    }
+    code = autoCode;
+  }
+
   const errors = [];
-  if (!code) errors.push("CODE_REQUIRED");
   if (!name) errors.push("NAME_REQUIRED");
   if (!LECTURER_STATUSES.includes(normalizeCode(status))) errors.push("INVALID_STATUS");
   if (!department_id) errors.push("DEPARTMENT_REQUIRED");
@@ -92,6 +103,7 @@ export const createLecturer = asyncHandler(async (req, res) => {
     email,
     phone,
     degree,
+    faculty,
     department_id,
     user_id: account.user._id,
     max_hours,
@@ -106,7 +118,7 @@ export const updateLecturer = asyncHandler(async (req, res) => {
     return errorResponse(res, "Không có quyền", ["FORBIDDEN"], 403);
   }
 
-  const allowed = ["name", "email", "phone", "degree"];
+  const allowed = ["name", "email", "phone", "degree", "faculty"];
   if (req.userRole === "ADMIN") {
     allowed.push("department_id", "user_id", "max_hours", "status");
   }

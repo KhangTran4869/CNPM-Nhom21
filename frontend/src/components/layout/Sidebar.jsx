@@ -17,9 +17,11 @@ const menu = {
     { path: "/classes", label: "Danh sách lớp tín chỉ" },
     { path: "/assignments", label: "Đề xuất phân công" },
     { path: "/reports", label: "Theo dõi khối lượng giảng dạy" },
+    { path: "/profile", label: "Cập nhật thông tin cá nhân" },
   ],
   ADMIN: [
     { path: "/users", label: "Quản lý tài khoản" },
+    { path: "/departments", label: "Quản lý bộ môn" },
     { path: "/lecturers", label: "Quản lý giảng viên" },
     { path: "/courses", label: "Quản lý môn học" },
     { path: "/semesters", label: "Quản lý học kỳ" },

@@ -22,6 +22,10 @@ const userSchema = new mongoose.Schema(
       enum: ["ACTIVE", "INACTIVE"],
       default: "ACTIVE",
     },
+    must_change_password: {
+      type: Boolean,
+      default: false,
+    },
     is_deleted: {
       type: Boolean,
       default: false,
