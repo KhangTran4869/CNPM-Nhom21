@@ -16,12 +16,18 @@ const formatDateTime = (value) =>
 const scheduleText = (schedule) =>
   `Thứ ${schedule.day_of_week}, tiết ${schedule.start_period}-${schedule.end_period}, phòng ${schedule.room_id?.name || "N/A"}`;
 
-const errorText = (err) =>
-  err.payload?.errors
-    ?.map((item) => item.message || item.rule || item)
-    .join(", ") ||
-  err.message ||
-  "Thao tác không thành công";
+const errorText = (err) => {
+  if (err?.status === 403 || err?.payload?.errors?.includes("FORBIDDEN")) {
+    return "Bạn không có quyền thực hiện chức năng này.";
+  }
+  return (
+    err.payload?.errors
+      ?.map((item) => item.message || item.rule || item)
+      .join(", ") ||
+    err.message ||
+    "Thao tác không thành công"
+  );
+};
 
 export function AssignmentsPage({ user }) {
   const [assignments, setAssignments] = useState([]);
@@ -34,8 +40,10 @@ export function AssignmentsPage({ user }) {
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const isLecturer = user?.role === "LECTURER";
   const canWrite = user?.role === "ADMIN" || user?.role === "HEAD";
   const isAdmin = user?.role === "ADMIN";
+  const canViewHistory = user?.role === "ADMIN" || user?.role === "HEAD";
 
   const availableClasses = useMemo(
     () => classes.filter((item) => item.status === "OPEN" || item._id === form.class_id),
@@ -47,14 +55,20 @@ export function AssignmentsPage({ user }) {
     assignmentService
       .getAssignments()
       .then(setAssignments)
-      .catch(() => setAssignments([]))
+      .catch((err) => {
+        console.error("Không thể tải danh sách phân công", err);
+        setAssignments([]);
+        setError(errorText(err));
+      })
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     load();
-    classService.getClasses().then(setClasses).catch(() => setClasses([]));
-  }, []);
+    if (canWrite) {
+      classService.getClasses().then(setClasses).catch(() => setClasses([]));
+    }
+  }, [canWrite]);
 
   const loadClassContext = async (classId) => {
     if (!classId) {
@@ -108,6 +122,7 @@ export function AssignmentsPage({ user }) {
   };
 
   const openHistory = async (assignment) => {
+    if (!canViewHistory) return;
     setSelectedAssignment(assignment);
     setError("");
     setModal("Lịch sử phân công");
@@ -115,6 +130,7 @@ export function AssignmentsPage({ user }) {
       const data = await assignmentService.getAssignmentHistory(assignment._id);
       setHistory(data);
     } catch (err) {
+      console.error("Không thể tải lịch sử phân công", err);
       setHistory([]);
       setError(errorText(err));
     }
@@ -171,17 +187,21 @@ export function AssignmentsPage({ user }) {
     { key: "status", title: "Trạng thái", render: (row) => <Badge>{String(row.status || "").toUpperCase()}</Badge> },
     { key: "creator", title: "Người phân công", render: (row) => row.assigned_by?.username || "N/A" },
     { key: "createdAt", title: "Ngày tạo", render: (row) => formatDateTime(row.createdAt || row.created_at) },
-    {
-      key: "actions",
-      title: "Hành động",
-      render: (row) => (
-        <div className="row-actions">
-          <Button variant="outline" onClick={() => openHistory(row)}>Lịch sử</Button>
-          {isAdmin && <Button variant="outline" onClick={() => openChangeLecturer(row)}>Sửa</Button>}
-          {isAdmin && <Button variant="danger" onClick={() => remove(row)}>Xóa</Button>}
-        </div>
-      ),
-    },
+    ...(!isLecturer
+      ? [
+          {
+            key: "actions",
+            title: "Hành động",
+            render: (row) => (
+              <div className="row-actions">
+                {canViewHistory && <Button variant="outline" onClick={() => openHistory(row)}>Lịch sử</Button>}
+                {isAdmin && <Button variant="outline" onClick={() => openChangeLecturer(row)}>Sửa</Button>}
+                {isAdmin && <Button variant="danger" onClick={() => remove(row)}>Xóa</Button>}
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   const suggestionColumns = [
@@ -213,9 +233,9 @@ export function AssignmentsPage({ user }) {
   ];
 
   return (
-    <>
+    <div className="page-stack">
       <Card
-        title="Danh sách phân công"
+        title={isLecturer ? "Phân công của tôi" : "Danh sách phân công"}
         actions={
           <div className="row-actions">
             {canWrite && <Button onClick={openCreate}>{isAdmin ? "Thêm phân công" : "Đề xuất phân công"}</Button>}
@@ -227,74 +247,80 @@ export function AssignmentsPage({ user }) {
         <Table columns={columns} rows={assignments} loading={loading} />
       </Card>
 
-      <Modal title={modal === "Thêm phân công" ? modal : ""} onClose={() => setModal("")}>
-        <form className="form-grid" onSubmit={submitCreate}>
-          <Select label="Lớp tín chỉ" value={form.class_id} onChange={(event) => changeClass(event.target.value)} required>
-            <option value="">Chọn lớp</option>
-            {availableClasses.map((item) => (
-              <option key={item._id} value={item._id}>{item.code} - {item.course_id?.name || "N/A"}</option>
-            ))}
-          </Select>
-          <label className="field wide">
-            <span>Lịch học của lớp</span>
-            <div className="alert">
-              {schedules.length ? schedules.map(scheduleText).join("; ") : "Chưa chọn lớp hoặc lớp chưa có lịch học"}
-            </div>
-          </label>
-          <label className="field wide">
-            <span>Giảng viên phù hợp</span>
-            <Table columns={suggestionColumns} rows={suggestions} emptyText="Không có giảng viên phù hợp" />
-          </label>
-          <Select label="Giảng viên đã chọn" value={form.lecturer_id} onChange={(event) => setForm({ ...form, lecturer_id: event.target.value })} required>
-            <option value="">Chọn giảng viên</option>
-            {suggestions.map((item) => (
-              <option key={item.lecturer_id} value={item.lecturer_id}>{item.code} - {item.name}</option>
-            ))}
-          </Select>
-          <label className="field wide">
-            <span>Ghi chú</span>
-            <textarea className="uis-input" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} />
-          </label>
-          {error && <div className="alert danger">{error}</div>}
-          <Button className="form-submit" type="submit">Lưu</Button>
-        </form>
-      </Modal>
+      {modal === "Thêm phân công" && (
+        <Modal title={modal} onClose={() => setModal("")}>
+          <form className="form-grid" onSubmit={submitCreate}>
+            <Select label="Lớp tín chỉ" value={form.class_id} onChange={(event) => changeClass(event.target.value)} required>
+              <option value="">Chọn lớp</option>
+              {availableClasses.map((item) => (
+                <option key={item._id} value={item._id}>{item.code} - {item.course_id?.name || "N/A"}</option>
+              ))}
+            </Select>
+            <label className="field wide">
+              <span>Lịch học của lớp</span>
+              <div className="alert">
+                {schedules.length ? schedules.map(scheduleText).join("; ") : "Chưa chọn lớp hoặc lớp chưa có lịch học"}
+              </div>
+            </label>
+            <label className="field wide">
+              <span>Giảng viên phù hợp</span>
+              <Table columns={suggestionColumns} rows={suggestions} emptyText="Không có giảng viên phù hợp" />
+            </label>
+            <Select label="Giảng viên đã chọn" value={form.lecturer_id} onChange={(event) => setForm({ ...form, lecturer_id: event.target.value })} required>
+              <option value="">Chọn giảng viên</option>
+              {suggestions.map((item) => (
+                <option key={item.lecturer_id} value={item.lecturer_id}>{item.code} - {item.name}</option>
+              ))}
+            </Select>
+            <label className="field wide">
+              <span>Ghi chú</span>
+              <textarea className="uis-input" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} />
+            </label>
+            {error && <div className="alert danger">{error}</div>}
+            <Button className="form-submit" type="submit">Lưu</Button>
+          </form>
+        </Modal>
+      )}
 
-      <Modal title={modal === "Đổi giảng viên" ? modal : ""} onClose={() => setModal("")}>
-        <form className="form-grid" onSubmit={submitChangeLecturer}>
-          <label className="field">
-            <span>Giảng viên hiện tại</span>
-            <div className="alert">{selectedAssignment?.lecturer_id?.name || "N/A"}</div>
-          </label>
-          <label className="field wide">
-            <span>Lịch học của lớp</span>
-            <div className="alert">
-              {schedules.length ? schedules.map(scheduleText).join("; ") : "Lớp chưa có lịch học"}
-            </div>
-          </label>
-          <label className="field wide">
-            <span>Giảng viên phù hợp</span>
-            <Table columns={suggestionColumns} rows={suggestions} emptyText="Không có giảng viên phù hợp" />
-          </label>
-          <Select label="Giảng viên mới" value={form.lecturer_id} onChange={(event) => setForm({ ...form, lecturer_id: event.target.value })} required>
-            <option value="">Chọn giảng viên</option>
-            {suggestions.map((item) => (
-              <option key={item.lecturer_id} value={item.lecturer_id}>{item.code} - {item.name}</option>
-            ))}
-          </Select>
-          <label className="field wide">
-            <span>Ghi chú</span>
-            <textarea className="uis-input" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} />
-          </label>
-          {error && <div className="alert danger">{error}</div>}
-          <Button className="form-submit" type="submit">Lưu thay đổi</Button>
-        </form>
-      </Modal>
+      {modal === "Đổi giảng viên" && (
+        <Modal title={modal} onClose={() => setModal("")}>
+          <form className="form-grid" onSubmit={submitChangeLecturer}>
+            <label className="field">
+              <span>Giảng viên hiện tại</span>
+              <div className="alert">{selectedAssignment?.lecturer_id?.name || "N/A"}</div>
+            </label>
+            <label className="field wide">
+              <span>Lịch học của lớp</span>
+              <div className="alert">
+                {schedules.length ? schedules.map(scheduleText).join("; ") : "Lớp chưa có lịch học"}
+              </div>
+            </label>
+            <label className="field wide">
+              <span>Giảng viên phù hợp</span>
+              <Table columns={suggestionColumns} rows={suggestions} emptyText="Không có giảng viên phù hợp" />
+            </label>
+            <Select label="Giảng viên mới" value={form.lecturer_id} onChange={(event) => setForm({ ...form, lecturer_id: event.target.value })} required>
+              <option value="">Chọn giảng viên</option>
+              {suggestions.map((item) => (
+                <option key={item.lecturer_id} value={item.lecturer_id}>{item.code} - {item.name}</option>
+              ))}
+            </Select>
+            <label className="field wide">
+              <span>Ghi chú</span>
+              <textarea className="uis-input" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} />
+            </label>
+            {error && <div className="alert danger">{error}</div>}
+            <Button className="form-submit" type="submit">Lưu thay đổi</Button>
+          </form>
+        </Modal>
+      )}
 
-      <Modal title={modal === "Lịch sử phân công" ? modal : ""} onClose={() => setModal("")}>
-        {error && <div className="alert danger">{error}</div>}
-        <Table columns={historyColumns} rows={history} />
-      </Modal>
-    </>
+      {modal === "Lịch sử phân công" && (
+        <Modal title={modal} onClose={() => setModal("")}>
+          {error && <div className="alert danger">{error}</div>}
+          <Table columns={historyColumns} rows={history} />
+        </Modal>
+      )}
+    </div>
   );
 }

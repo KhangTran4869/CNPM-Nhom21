@@ -8,6 +8,7 @@ export const classService = {
   getClassSchedules: (classId) => api.get(`/classes/${classId}/schedules`),
   createClassSchedule: (classId, data) =>
     api.post(`/classes/${classId}/schedules`, data),
+  updateSchedule: (id, data) => api.put(`/schedules/${id}`, data),
   getSuggestedLecturers: (classId) =>
     api.get(`/classes/${classId}/suggest-lecturers`),
 };

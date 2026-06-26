@@ -7,6 +7,7 @@ import { tokenStore } from "./services/api";
 import { LoginPage } from "./pages/LoginPage";
 import { HomePage } from "./pages/HomePage";
 import { WeeklySchedulePage } from "./pages/WeeklySchedulePage";
+import { SemesterSchedulePage } from "./pages/SemesterSchedulePage";
 import { LecturersPage } from "./pages/LecturersPage";
 import { ClassesPage } from "./pages/ClassesPage";
 import { AssignmentsPage } from "./pages/AssignmentsPage";
@@ -20,6 +21,7 @@ import { CoursesPage } from "./pages/CoursesPage";
 import { SemestersPage } from "./pages/SemestersPage";
 import { RoomsPage } from "./pages/RoomsPage";
 import { AssignmentHistoryPage } from "./pages/AssignmentHistoryPage";
+import { AssignmentApprovalPage } from "./pages/AssignmentApprovalPage";
 import { Modal } from "./components/ui/Modal";
 import { Input } from "./components/ui/Field";
 import { Button } from "./components/ui/Button";
@@ -31,6 +33,7 @@ const routeRoles = {
   "/lecturers": ["ADMIN", "HEAD"],
   "/classes": ["ADMIN", "HEAD", "LECTURER"],
   "/assignments": ["ADMIN", "HEAD", "LECTURER"],
+  "/assignments/approval": ["ADMIN"],
   "/availability": ["ADMIN", "LECTURER"],
   "/reports": ["ADMIN", "HEAD", "LECTURER"],
   "/users": ["ADMIN"],
@@ -104,10 +107,11 @@ function App() {
 
     if (path === "/home") return <HomePage user={user} navigate={navigate} />;
     if (path === "/teaching-schedule/weekly") return <WeeklySchedulePage user={user} />;
-    if (path === "/teaching-schedule/semester") return <ComingSoonPage title="Thời khóa biểu dạng học kỳ" />;
+    if (path === "/teaching-schedule/semester") return <SemesterSchedulePage user={user} />;
     if (path === "/lecturers") return <LecturersPage user={user} />;
     if (path === "/classes") return <ClassesPage user={user} />;
     if (path === "/assignments") return <AssignmentsPage user={user} />;
+    if (path === "/assignments/approval") return <AssignmentApprovalPage />;
     if (path === "/availability") return <AvailabilityPage user={user} />;
     if (path === "/reports") return <ReportsPage user={user} />;
     if (path === "/users") return <UsersPage />;
@@ -163,57 +167,61 @@ function App() {
   if (booting) return <div className="boot-screen">Đang khởi động giao diện...</div>;
   if (path === "/login" || !user) return <LoginPage onLogin={onLogin} />;
 
-  return (
-    <AppLayout
-      user={user}
-      path={path}
-      collapsed={collapsed}
-      onMenu={() => setCollapsed((value) => !value)}
-      onLogout={onLogout}
-      navigate={navigate}
-    >
-      {page}
+  const forcePasswordModal =
+    user?.must_change_password && (
+      <Modal title="Yêu cầu đổi mật khẩu lần đầu" onClose={() => {}}>
+        <div style={{ marginBottom: "16px", color: "var(--text-secondary)", fontSize: "14px" }}>
+          Tài khoản của bạn đang sử dụng mật khẩu mặc định (123456). Vì lý do bảo mật, vui lòng đặt lại mật khẩu mới trước khi tiếp tục.
+        </div>
+        <form className="form-grid" onSubmit={submitForceChangePass}>
+          <Input
+            label="Mật khẩu hiện tại (123456)"
+            type="password"
+            value={passForm.old_password}
+            onChange={(e) => setPassForm({ ...passForm, old_password: e.target.value })}
+            required
+            placeholder="Nhập 123456"
+          />
+          <Input
+            label="Mật khẩu mới"
+            type="password"
+            value={passForm.new_password}
+            onChange={(e) => setPassForm({ ...passForm, new_password: e.target.value })}
+            required
+            minLength={6}
+            placeholder="Ít nhất 6 ký tự"
+          />
+          <Input
+            label="Xác nhận mật khẩu mới"
+            type="password"
+            value={passForm.confirm_password}
+            onChange={(e) => setPassForm({ ...passForm, confirm_password: e.target.value })}
+            required
+            minLength={6}
+            placeholder="Nhập lại mật khẩu mới"
+          />
+          {passError && <div className="alert danger">{passError}</div>}
+          <Button className="form-submit" type="submit" disabled={changingPass}>
+            {changingPass ? "Đang đổi mật khẩu..." : "Cập nhật mật khẩu"}
+          </Button>
+        </form>
+      </Modal>
+    );
 
-      {user?.must_change_password && (
-        <Modal title="Yêu cầu đổi mật khẩu lần đầu" onClose={() => {}}>
-          <div style={{ marginBottom: "16px", color: "var(--text-secondary)", fontSize: "14px" }}>
-            Tài khoản của bạn đang sử dụng mật khẩu mặc định (123456). Vì lý do bảo mật, vui lòng đặt lại mật khẩu mới trước khi tiếp tục.
-          </div>
-          <form className="form-grid" onSubmit={submitForceChangePass}>
-            <Input
-              label="Mật khẩu hiện tại (123456)"
-              type="password"
-              value={passForm.old_password}
-              onChange={(e) => setPassForm({ ...passForm, old_password: e.target.value })}
-              required
-              placeholder="Nhập 123456"
-            />
-            <Input
-              label="Mật khẩu mới"
-              type="password"
-              value={passForm.new_password}
-              onChange={(e) => setPassForm({ ...passForm, new_password: e.target.value })}
-              required
-              minLength={6}
-              placeholder="Ít nhất 6 ký tự"
-            />
-            <Input
-              label="Xác nhận mật khẩu mới"
-              type="password"
-              value={passForm.confirm_password}
-              onChange={(e) => setPassForm({ ...passForm, confirm_password: e.target.value })}
-              required
-              minLength={6}
-              placeholder="Nhập lại mật khẩu mới"
-            />
-            {passError && <div className="alert danger">{passError}</div>}
-            <Button className="form-submit" type="submit" disabled={changingPass}>
-              {changingPass ? "Đang đổi mật khẩu..." : "Cập nhật mật khẩu"}
-            </Button>
-          </form>
-        </Modal>
-      )}
-    </AppLayout>
+  return (
+    <>
+      <AppLayout
+        user={user}
+        path={path}
+        collapsed={collapsed}
+        onMenu={() => setCollapsed((value) => !value)}
+        onLogout={onLogout}
+        navigate={navigate}
+      >
+        {page}
+      </AppLayout>
+      {forcePasswordModal}
+    </>
   );
 }
 

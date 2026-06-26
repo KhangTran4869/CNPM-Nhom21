@@ -48,7 +48,7 @@ export function HomePage({ user, navigate }) {
       ) : (
         <div className="grid-stack" style={{ display: "grid", gap: "20px" }}>
           <Card title={isHead ? "Hồ sơ Trưởng bộ môn" : "Hồ sơ Giảng viên"}>
-            <div className="profile-grid">
+            <div className="profile-grid profile-grid-lecturer">
               <div className="profile-avatar">
                 {user?.name?.slice(0, 1)?.toUpperCase() || user?.username?.slice(0, 1)?.toUpperCase()}
               </div>
@@ -61,7 +61,7 @@ export function HomePage({ user, navigate }) {
               <Info label="Định mức giờ dạy" value={user?.max_hours ? `${user.max_hours} giờ / kỳ` : fallback} />
               <Info label="Trạng thái giảng dạy" value={<Badge>{user?.lecturer_status || user?.status}</Badge>} />
               <Info label="Số điện thoại" value={user?.phone} />
-              <Info label="Email liên hệ" value={user?.email} />
+              <Info className="wide" label="Email liên hệ" value={user?.email} />
             </div>
             <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px dashed #e5e7eb" }}>
               <Button onClick={() => navigate?.("/profile")} style={{ width: "100%" }}>
@@ -99,9 +99,9 @@ export function HomePage({ user, navigate }) {
   );
 }
 
-function Info({ label, value }) {
+function Info({ label, value, className = "" }) {
   return (
-    <div className="info-cell">
+    <div className={`info-cell ${className}`}>
       <span>{label}</span>
       <strong>{value || fallback}</strong>
     </div>

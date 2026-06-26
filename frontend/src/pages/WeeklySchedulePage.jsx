@@ -24,6 +24,14 @@ const groupOfClass = (classCode) => {
 const courseTitle = (course) =>
   `${course?.name || "Môn học"}${course?.code ? ` (${course.code})` : ""}`;
 
+const sessionTypeOf = (schedule) => String(schedule?.session_type || "THEORY").toUpperCase();
+
+const sessionTypeLabel = (schedule) =>
+  sessionTypeOf(schedule) === "PRACTICE" ? "Thực hành" : "Lý thuyết";
+
+const sessionTypeClass = (schedule) =>
+  sessionTypeOf(schedule) === "PRACTICE" ? "practice" : "theory";
+
 const startOfDay = (value) => {
   const date = value ? new Date(value) : new Date();
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -212,14 +220,15 @@ export function WeeklySchedulePage({ user }) {
                   const course = cls.course_id || {};
                   return (
                     <td
-                      className={`schedule-cell ${cell ? "has-class" : ""}`}
+                      className={`schedule-cell ${cell ? `has-class ${sessionTypeClass(cell.schedule)}` : ""}`}
                       key={`${day.key}-${period}`}
                       rowSpan={cell?.rowSpan || 1}
                     >
                       {cell && (
                         <div className="schedule-class-block">
                           <strong>{courseTitle(course)}</strong>
-                          <span>Nhóm: {groupOfClass(cls.code)}</span>
+                          <span>Loại: {sessionTypeLabel(cell.schedule)}</span>
+                          <span>Nhóm: {cell.schedule.group_code || groupOfClass(cls.code)}</span>
                           <span>Phòng: {cell.schedule.room_id?.name || "N/A"}</span>
                           {user?.role !== "LECTURER" && <span>GV: {cell.assignment.lecturer_id?.name || "N/A"}</span>}
                         </div>
