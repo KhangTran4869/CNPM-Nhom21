@@ -1,12 +1,16 @@
+import { useState } from "react";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { InfoCell } from "./InfoCell";
+import { EditProfileModal } from "../../components/profile/EditProfileModal";
 
 /**
  * Giao diện Trang chủ dành riêng cho Giảng viên (LECTURER)
  */
-export function LecturerHome({ user, navigate }) {
+export function LecturerHome({ user, onUserChange }) {
+  const [editModal, setEditModal] = useState(false);
+
   return (
     <div className="grid-stack" style={{ display: "grid", gap: "20px" }}>
       <Card title="Hồ sơ Giảng viên">
@@ -29,7 +33,7 @@ export function LecturerHome({ user, navigate }) {
           <InfoCell label="Email liên hệ" value={user?.email} />
         </div>
         <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px dashed #e5e7eb" }}>
-          <Button onClick={() => navigate?.("/profile")} style={{ width: "100%" }}>
+          <Button onClick={() => setEditModal(true)} style={{ width: "100%" }}>
             ✏️ Chỉnh sửa thông tin cá nhân & Liên hệ
           </Button>
         </div>
@@ -45,6 +49,14 @@ export function LecturerHome({ user, navigate }) {
           </ul>
         </div>
       </Card>
+
+      {editModal && (
+        <EditProfileModal
+          user={user}
+          onClose={() => setEditModal(false)}
+          onUserChange={onUserChange}
+        />
+      )}
     </div>
   );
 }

@@ -117,7 +117,7 @@ export function ReportsPage({ user }) {
 
   return (
     <Card
-      title={isLecturer ? "Tải giảng dạy của tôi" : "Báo cáo thống kê"}
+      title={isLecturer ? "Khối lượng giảng dạy của tôi" : "Báo cáo thống kê"}
       actions={!isLecturer && isAdmin && tab === "assignments" && (
         <div className="row-actions">
           <Button variant="outline" onClick={() => exportReport("excel")}>Xuất Excel</Button>
@@ -129,7 +129,7 @@ export function ReportsPage({ user }) {
         {!isLecturer && (
           <Button variant={tab === "assignments" ? "primary" : "outline"} onClick={() => setTab("assignments")}>Danh sách phân công</Button>
         )}
-        <Button variant={tab === "workloads" ? "primary" : "outline"} onClick={() => setTab("workloads")}>Tải giảng dạy</Button>
+        <Button variant={tab === "workloads" ? "primary" : "outline"} onClick={() => setTab("workloads")}>Khối lượng giảng dạy</Button>
       </div>
       <div className="filter-row">
         <Select label="Học kỳ" value={semesterId} onChange={(e) => setSemesterId(e.target.value)}>

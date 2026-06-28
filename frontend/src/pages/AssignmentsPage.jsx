@@ -234,7 +234,9 @@ export function AssignmentsPage({ user, navigate }) {
   ];
 
   const historyColumns = [
-    { key: "assignment", title: "Assignment ID", render: (row) => row.assignment_id?._id || row.assignment_id },
+    { key: "class", title: "Lớp", render: (row) => row.assignment_id?.class_id?.code || selectedAssignment?.class_id?.code || "N/A" },
+    { key: "course", title: "Môn học", render: (row) => row.assignment_id?.class_id?.course_id?.name || selectedAssignment?.class_id?.course_id?.name || "N/A" },
+    { key: "semester", title: "Học kỳ", render: (row) => row.assignment_id?.class_id?.semester_id?.name || selectedAssignment?.class_id?.semester_id?.name || "N/A" },
     { key: "old", title: "Giảng viên cũ", render: (row) => row.old_lecturer_id?.name || row.old_lecturer?.name || "N/A" },
     { key: "new", title: "Giảng viên mới", render: (row) => row.new_lecturer_id?.name || row.new_lecturer?.name || "N/A" },
     { key: "changed_at", title: "Thời gian thay đổi", render: (row) => formatDateTime(row.changed_at) },

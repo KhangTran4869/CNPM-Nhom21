@@ -7,6 +7,7 @@ import { CoursesPage } from "../pages/CoursesPage";
 import { DepartmentsPage } from "../pages/DepartmentsPage";
 import { HomePage } from "../pages/HomePage";
 import { LecturersPage } from "../pages/LecturersPage";
+import { NotificationsPage } from "../pages/NotificationsPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { ReportsPage } from "../pages/ReportsPage";
 import { RoomsPage } from "../pages/RoomsPage";
@@ -68,7 +69,7 @@ export function renderPage({ path, user, navigate, setUser }) {
     case "/reports":
       return <ReportsPage user={user} />;
     case "/users":
-      return <UsersPage />;
+      return <UsersPage user={user} />;
     case "/departments":
       return <DepartmentsPage />;
     case "/courses":
@@ -80,10 +81,10 @@ export function renderPage({ path, user, navigate, setUser }) {
     case "/assignment-history":
       return <AssignmentHistoryPage />;
     case "/notifications":
-      return <ComingSoonPage title="Thông báo từ ban quản trị" />;
+      return <NotificationsPage user={user} />;
     case "/profile":
       return <ProfilePage user={user} onUserChange={setUser} />;
     default:
-      return <HomePage user={user} navigate={navigate} />;
+      return <HomePage user={user} navigate={navigate} onUserChange={setUser} />;
   }
 }

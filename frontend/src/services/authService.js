@@ -7,7 +7,8 @@ export const authService = {
     return data;
   },
   getMe: () => api.get("/auth/me"),
-  changePassword: (data) => api.post("/change-password", data),
+  changePassword: (data) => api.post("/auth/change-password", data),
+  updateProfile: (data) => api.put("/auth/profile", data),
   logout() {
     tokenStore.clear();
   },
