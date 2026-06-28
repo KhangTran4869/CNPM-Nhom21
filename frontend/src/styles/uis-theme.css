@@ -274,6 +274,18 @@
   grid-template-columns: repeat(2, minmax(180px, 1fr));
 }
 
+.report-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.report-toolbar .field {
+  width: min(280px, 100%);
+}
+
 .field {
   display: grid;
   gap: 6px;
@@ -650,6 +662,15 @@ textarea.uis-input {
   .profile-grid,
   .semester-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .report-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .report-toolbar .field {
+    width: 100%;
   }
 
   .main-content {

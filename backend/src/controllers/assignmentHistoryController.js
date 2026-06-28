@@ -5,7 +5,17 @@ export const getAllAssignmentsHistory = asyncHandler(async (req, res) => {
   const filter = { is_deleted: false };
   if (req.params.assignment_id) filter.assignment_id = req.params.assignment_id;
   const history = await AssignmentHistory.find(filter)
-    .populate("assignment_id old_lecturer_id new_lecturer_id")
+    .populate({
+      path: "assignment_id",
+      populate: [
+        {
+          path: "class_id",
+          populate: [{ path: "course_id" }, { path: "semester_id" }],
+        },
+        { path: "lecturer_id" },
+      ],
+    })
+    .populate("old_lecturer_id new_lecturer_id")
     .sort({ changed_at: "desc" });
   return successResponse(res, history);
 });

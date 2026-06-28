@@ -125,13 +125,13 @@ export function ReportsPage({ user }) {
         </div>
       )}
     >
-      <div className="tabs">
-        {!isLecturer && (
-          <Button variant={tab === "assignments" ? "primary" : "outline"} onClick={() => setTab("assignments")}>Danh sách phân công</Button>
-        )}
-        <Button variant={tab === "workloads" ? "primary" : "outline"} onClick={() => setTab("workloads")}>Tải giảng dạy</Button>
-      </div>
-      <div className="filter-row">
+      <div className="report-toolbar">
+        <div className="tabs">
+          {!isLecturer && (
+            <Button variant={tab === "assignments" ? "primary" : "outline"} onClick={() => setTab("assignments")}>Danh sách phân công</Button>
+          )}
+          <Button variant={tab === "workloads" ? "primary" : "outline"} onClick={() => setTab("workloads")}>Tải giảng dạy</Button>
+        </div>
         <Select label="Học kỳ" value={semesterId} onChange={(e) => setSemesterId(e.target.value)}>
           {semesters.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
         </Select>
