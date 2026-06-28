@@ -28,15 +28,9 @@ export function ProfilePage({ user, onUserChange }) {
     setMessage("");
     setError("");
 
-    if (!user?.lecturer_id) {
-      setError("Tài khoản này chưa được liên kết với hồ sơ giảng viên");
-      return;
-    }
-
     setSaving(true);
     try {
-      await lecturerService.updateLecturer(user.lecturer_id, form);
-      const nextUser = await authService.getMe();
+      const nextUser = await authService.updateProfile(form);
       onUserChange(nextUser);
       setMessage("Cập nhật thông tin thành công");
     } catch (err) {
@@ -55,12 +49,12 @@ export function ProfilePage({ user, onUserChange }) {
       <Card title="Cập nhật thông tin cá nhân">
         <div className="profile-grid profile-summary">
           <div className="profile-avatar">{user?.name?.slice(0, 1)?.toUpperCase() || user?.username?.slice(0, 1)?.toUpperCase()}</div>
-          <Info label="Mã giảng viên" value={user?.code} />
+          {user?.role !== "HEAD" && <Info label="Mã giảng viên" value={user?.code} />}
           <Info label="Tài khoản" value={user?.username} />
-          <Info label="Bộ môn" value={user?.department} />
-          <Info label="Vai trò" value={<Badge>{user?.role}</Badge>} />
+          <Info label={user?.role === "HEAD" ? "Đơn vị khoa" : "Bộ môn"} value={user?.department || user?.faculty} />
+          <Info label="Vai trò" value={<Badge>{user?.role === "HEAD" ? "Trưởng khoa" : user?.role}</Badge>} />
           <Info label="Trạng thái tài khoản" value={<Badge>{user?.status}</Badge>} />
-          <Info label="Định mức giờ" value={user?.max_hours} />
+          {user?.role !== "HEAD" && <Info label="Định mức giờ" value={user?.max_hours} />}
         </div>
       </Card>
 

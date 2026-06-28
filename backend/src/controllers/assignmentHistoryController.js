@@ -7,13 +7,10 @@ export const getAllAssignmentsHistory = asyncHandler(async (req, res) => {
   const history = await AssignmentHistory.find(filter)
     .populate({
       path: "assignment_id",
-      populate: [
-        {
-          path: "class_id",
-          populate: [{ path: "course_id" }, { path: "semester_id" }],
-        },
-        { path: "lecturer_id" },
-      ],
+      populate: {
+        path: "class_id",
+        populate: [{ path: "course_id" }, { path: "semester_id" }],
+      },
     })
     .populate("old_lecturer_id new_lecturer_id")
     .sort({ changed_at: "desc" });

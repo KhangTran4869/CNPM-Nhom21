@@ -1,6 +1,7 @@
 import User from "../models/User.js";
 import Role from "../models/Role.js";
 import Lecturer from "../models/Lecturer.js";
+import Department from "../models/Department.js";
 import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
 import { normalizeCode, USER_STATUSES } from "../utils/constants.js";
 import { hashPassword } from "../utils/password.js";
@@ -46,9 +47,38 @@ export const getAllUsers = asyncHandler(async (req, res) => {
   return successResponse(res, users);
 });
 
+const syncLecturerWithUser = async (user, role_id) => {
+  const roleDoc = await Role.findById(role_id || user.role_id);
+  if (roleDoc && (roleDoc.code === "LECTURER" || roleDoc.code === "HEAD")) {
+    let lecturer = await Lecturer.findOne({ user_id: user._id, is_deleted: false });
+    if (!lecturer) {
+      const defaultDept = await Department.findOne({ is_deleted: false });
+      const count = await Lecturer.countDocuments();
+      let autoCode = `GV${String(count + 1).padStart(3, "0")}`;
+      while (await Lecturer.exists({ code: autoCode })) {
+        autoCode = `GV_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+      }
+      await Lecturer.create({
+        code: autoCode,
+        name: user.username,
+        email: `${user.username}@gmail.com`,
+        phone: "",
+        degree: roleDoc.code === "HEAD" ? "Tiến sĩ" : "Thạc sĩ",
+        faculty: "Khoa Công nghệ thông tin",
+        department_id: defaultDept ? defaultDept._id : null,
+        user_id: user._id,
+        status: user.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
+      });
+    } else {
+      lecturer.status = user.status === "ACTIVE" ? "ACTIVE" : "INACTIVE";
+      await lecturer.save();
+    }
+  }
+};
+
 /**
  * Tạo mới một tài khoản người dùng từ trang Admin
- * Nếu mật khẩu đặt là 123456 -> bật cờ yêu cầu đổi mật khẩu lần đầu
+ * Nếu tạo vai trò LECTURER hoặc HEAD -> tự động đồng bộ hồ sơ vào danh sách giảng viên.
  */
 export const createUser = asyncHandler(async (req, res) => {
   const { username, password, role_id, status = "ACTIVE" } = req.body;
@@ -69,6 +99,8 @@ export const createUser = asyncHandler(async (req, res) => {
     must_change_password: password === "123456",
   });
 
+  await syncLecturerWithUser(user, role_id);
+
   return successResponse(res, user, "Tạo người dùng thành công", 201);
 });
 
@@ -78,7 +110,6 @@ export const createUser = asyncHandler(async (req, res) => {
 export const updateUser = asyncHandler(async (req, res) => {
   const updates = {};
 
-  // Nếu có nhập mật khẩu mới -> tiến hành băm (hash) và cập nhật
   if (req.body.password && req.body.password.trim() !== "") {
     if (req.body.password.length < 6) {
       return errorResponse(res, "Mật khẩu mới phải có ít nhất 6 ký tự", ["PASSWORD_MIN_6"], 400);
@@ -102,6 +133,15 @@ export const updateUser = asyncHandler(async (req, res) => {
     updates.status = status;
   }
 
+  if (req.body.username && req.body.username.trim() !== "") {
+    const newUsername = req.body.username.trim();
+    const existing = await User.findOne({ username: newUsername, _id: { $ne: req.params.id }, is_deleted: false });
+    if (existing) {
+      return errorResponse(res, "Tên đăng nhập đã tồn tại", ["USERNAME_EXISTS"], 400);
+    }
+    updates.username = newUsername;
+  }
+
   const user = await User.findOneAndUpdate(
     { _id: req.params.id, is_deleted: false },
     updates,
@@ -109,18 +149,34 @@ export const updateUser = asyncHandler(async (req, res) => {
   ).populate("role_id");
 
   if (!user) return errorResponse(res, "Người dùng không tồn tại", ["USER_NOT_FOUND"], 404);
+
+  if (updates.username) {
+    await Lecturer.findOneAndUpdate(
+      { user_id: user._id, is_deleted: false },
+      { name: updates.username }
+    );
+  }
+
+  await syncLecturerWithUser(user, updates.role_id);
+
   return successResponse(res, user, "Cập nhật tài khoản thành công");
 });
 
 /**
- * Xóa mềm tài khoản người dùng
+ * Xóa mềm tài khoản người dùng và đồng bộ xóa mềm hồ sơ giảng viên
  */
 export const deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findOneAndUpdate(
     { _id: req.params.id, is_deleted: false },
-    { is_deleted: true },
+    { is_deleted: true, status: "INACTIVE" },
     { new: true },
   );
   if (!user) return errorResponse(res, "Người dùng không tồn tại", ["USER_NOT_FOUND"], 404);
+
+  await Lecturer.findOneAndUpdate(
+    { user_id: user._id, is_deleted: false },
+    { is_deleted: true, status: "INACTIVE" }
+  );
+
   return successResponse(res, user, "Người dùng đã được xóa");
 });

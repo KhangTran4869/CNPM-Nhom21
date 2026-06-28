@@ -115,3 +115,35 @@ export const changePassword = asyncHandler(async (req, res) => {
 
   return successResponse(res, await publicUser(user), "Đổi mật khẩu thành công");
 });
+
+/**
+ * API Cập nhật thông tin cá nhân (Họ tên, email, sđt, học vị)
+ * Nếu tài khoản chưa được liên kết với hồ sơ Lecturer trong CSDL, tự động tạo hồ sơ mới và liên kết.
+ */
+export const updateProfile = asyncHandler(async (req, res) => {
+  const { name, email, phone, degree } = req.body;
+
+  let lecturer = await Lecturer.findOne({ user_id: req.user._id, is_deleted: false });
+  if (!lecturer) {
+    lecturer = new Lecturer({
+      user_id: req.user._id,
+      code: req.user.username.toUpperCase(),
+      name: name || req.user.username,
+      email: email || "",
+      phone: phone || "",
+      degree: degree || "",
+      faculty: "Khoa Công nghệ thông tin",
+      status: "ACTIVE",
+    });
+  } else {
+    if (name !== undefined) lecturer.name = name;
+    if (email !== undefined) lecturer.email = email;
+    if (phone !== undefined) lecturer.phone = phone;
+    if (degree !== undefined) lecturer.degree = degree;
+  }
+  await lecturer.save();
+
+  const updatedUser = await User.findById(req.user._id).populate("role_id");
+  return successResponse(res, await publicUser(updatedUser), "Cập nhật thông tin thành công");
+});
+
