@@ -64,6 +64,12 @@ export const getAssignmentById = asyncHandler(async (req, res) => {
   if (!assignment) {
     return errorResponse(res, "Không tìm thấy phân công", ["ASSIGNMENT_NOT_FOUND"], 404);
   }
+  if (
+    req.userRole === "LECTURER" &&
+    String(assignment.lecturer_id?._id || assignment.lecturer_id) !== String(req.lecturer?._id)
+  ) {
+    return errorResponse(res, "Bạn không có quyền thực hiện chức năng này", ["FORBIDDEN"], 403);
+  }
   return successResponse(res, assignment);
 });
 

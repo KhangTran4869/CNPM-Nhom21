@@ -57,6 +57,8 @@
 .app-layout {
   min-height: 100vh;
   background: var(--background);
+  display: flex;
+  flex-direction: column;
 }
 
 .top-header {
@@ -105,11 +107,14 @@
 }
 
 .layout-body {
+  flex: 1;
   min-height: calc(100vh - 56px);
   display: flex;
+  align-items: stretch;
 }
 
 .sidebar {
+  flex: 0 0 280px;
   width: 280px;
   background: var(--white);
   border-right: 1px solid #b9e6ff;
@@ -118,6 +123,7 @@
 }
 
 .sidebar.collapsed {
+  flex-basis: 76px;
   width: 76px;
 }
 
@@ -161,11 +167,21 @@
 .main-content {
   flex: 1;
   min-width: 0;
-  padding: 16px;
+  width: 100%;
+  padding: 24px;
+  overflow-x: hidden;
 }
 
 .page-stack {
   display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 16px;
 }
 
@@ -207,6 +223,11 @@
   cursor: pointer;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.uis-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 
 .uis-btn-primary {
@@ -367,6 +388,14 @@ textarea.uis-input {
   font-weight: 800;
 }
 
+.profile-grid-lecturer .profile-avatar {
+  grid-row: span 4;
+}
+
+.profile-grid-lecturer .info-cell.wide {
+  grid-column: 2 / -1;
+}
+
 .info-cell {
   border: 1px solid #d8f1ff;
   border-radius: 8px;
@@ -423,10 +452,16 @@ textarea.uis-input {
   text-align: left;
 }
 
-.schedule-cell.has-class {
+.schedule-cell.has-class.theory {
   background: #cfe6ff;
   color: #111827;
   border: 2px solid #1f9bef;
+}
+
+.schedule-cell.has-class.practice {
+  background: #ffe0e4;
+  color: #7f1d1d;
+  border: 2px solid #ef4444;
 }
 
 .schedule-class-block {
@@ -456,6 +491,80 @@ textarea.uis-input {
   height: 1px;
   margin-top: 4px;
   background: #1f9bef;
+}
+
+.schedule-cell.practice .schedule-class-block::after {
+  background: #ef4444;
+}
+
+.semester-toolbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(220px, 1fr);
+  gap: 12px 30px;
+  align-items: end;
+  max-width: 720px;
+  margin-bottom: 16px;
+}
+
+.semester-schedule-actions {
+  justify-content: flex-end;
+}
+
+.semester-table-wrap {
+  border: 1px solid #1f9bef;
+  border-radius: 8px;
+  overflow: auto;
+}
+
+.semester-table {
+  width: 100%;
+  min-width: 1040px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 14px;
+}
+
+.semester-table th {
+  color: var(--text-main);
+  background: #fff;
+  border-bottom: 2px solid #1f9bef;
+  padding: 12px 8px;
+  text-align: left;
+  font-weight: 800;
+}
+
+.semester-table td {
+  border-bottom: 1px solid #1f9bef;
+  padding: 14px 8px;
+  color: var(--text-main);
+  vertical-align: middle;
+}
+
+.semester-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.semester-table th:nth-child(1),
+.semester-table th:nth-child(3),
+.semester-table th:nth-child(4),
+.semester-table th:nth-child(6),
+.semester-table th:nth-child(7),
+.semester-table th:nth-child(8),
+.semester-table th:nth-child(9),
+.semester-table td:nth-child(1),
+.semester-table td:nth-child(3),
+.semester-table td:nth-child(4),
+.semester-table td:nth-child(6),
+.semester-table td:nth-child(7),
+.semester-table td:nth-child(8),
+.semester-table td:nth-child(9) {
+  text-align: center;
+}
+
+.semester-class-cell {
+  text-align: center;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .modal-backdrop {
@@ -522,6 +631,7 @@ textarea.uis-input {
 
   .sidebar {
     width: 100%;
+    flex-basis: auto;
     border-right: 0;
     border-bottom: 1px solid #b9e6ff;
   }
@@ -537,12 +647,23 @@ textarea.uis-input {
 
   .filter-row,
   .form-grid,
-  .profile-grid {
+  .profile-grid,
+  .semester-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .main-content {
+    padding: 16px;
   }
 
   .profile-avatar {
     width: 110px;
+    grid-row: auto;
+  }
+
+  .profile-grid-lecturer .profile-avatar,
+  .profile-grid-lecturer .info-cell.wide {
+    grid-column: auto;
     grid-row: auto;
   }
 

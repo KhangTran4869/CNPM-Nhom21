@@ -10,7 +10,20 @@ export const errorResponse = (
   message = "Dữ liệu không hợp lệ",
   errors = [],
   statusCode = 400,
-) => res.status(statusCode).json({ success: false, message, errors });
+) => {
+  const normalizedErrors = Array.isArray(errors) ? errors : [errors];
+  const firstError = normalizedErrors[0];
+  const error =
+    typeof firstError === "string"
+      ? firstError
+      : firstError?.rule || firstError?.message || "ERROR";
+  return res.status(statusCode).json({
+    success: false,
+    error,
+    message,
+    errors: normalizedErrors,
+  });
+};
 
 export class ApiError extends Error {
   constructor(message, statusCode = 400, errors = []) {

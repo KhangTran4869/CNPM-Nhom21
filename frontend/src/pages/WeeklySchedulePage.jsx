@@ -14,6 +14,8 @@ const days = [
   { key: 8, label: "Chủ Nhật" },
 ];
 
+const sessionsPerCredit = 4;
+
 const groupOfClass = (classCode) => {
   const match = String(classCode || "").match(/(\d+)$/);
   return match ? match[1] : classCode || "N/A";
@@ -22,9 +24,82 @@ const groupOfClass = (classCode) => {
 const courseTitle = (course) =>
   `${course?.name || "Môn học"}${course?.code ? ` (${course.code})` : ""}`;
 
+const sessionTypeOf = (schedule) => String(schedule?.session_type || "THEORY").toUpperCase();
+
+const sessionTypeLabel = (schedule) =>
+  sessionTypeOf(schedule) === "PRACTICE" ? "Thực hành" : "Lý thuyết";
+
+const sessionTypeClass = (schedule) =>
+  sessionTypeOf(schedule) === "PRACTICE" ? "practice" : "theory";
+
+const startOfDay = (value) => {
+  const date = value ? new Date(value) : new Date();
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+};
+
+const addDays = (date, daysToAdd) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + daysToAdd);
+  return next;
+};
+
+const formatShortDate = (date) =>
+  date.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+const getWeekRange = (semesterStart, semesterEnd, index) => {
+  const start = addDays(semesterStart, index * 7);
+  const end = new Date(Math.min(addDays(start, 6).getTime(), semesterEnd.getTime()));
+  return { start, end };
+};
+
+const buildSemesterWeeks = (semester) => {
+  if (!semester?.start_date || !semester?.end_date) return [];
+  const semesterStart = startOfDay(semester.start_date);
+  const semesterEnd = startOfDay(semester.end_date);
+  if (semesterEnd < semesterStart) return [];
+
+  const totalDays = Math.floor((semesterEnd - semesterStart) / 86400000) + 1;
+  return Array.from({ length: Math.ceil(totalDays / 7) }, (_, index) => ({
+    value: String(index + 1),
+    number: index + 1,
+    ...getWeekRange(semesterStart, semesterEnd, index),
+  }));
+};
+
+const findCurrentWeek = (weeks) => {
+  const today = startOfDay();
+  return weeks.find((week) => week.start <= today && today <= week.end);
+};
+
+const getClassSemesterId = (cls) => String(cls?.semester_id?._id || cls?.semester_id || "");
+
+const getWeeklySchedules = (cls) =>
+  [...(cls?.schedules || [])]
+    .filter((schedule) => schedule.day_of_week && schedule.start_period && schedule.end_period)
+    .sort((left, right) => {
+      const dayDiff = Number(left.day_of_week) - Number(right.day_of_week);
+      return dayDiff || Number(left.start_period) - Number(right.start_period);
+    });
+
+const shouldShowScheduleInWeek = (cls, schedule, weekNumber) => {
+  const selectedWeek = Number(weekNumber || 1);
+  const credits = Number(cls?.course_id?.credits || 0);
+  const totalSessions = credits > 0 ? credits * sessionsPerCredit : Infinity;
+  const weeklySchedules = getWeeklySchedules(cls);
+  const scheduleIndex = weeklySchedules.findIndex((item) => String(item._id) === String(schedule._id));
+
+  if (scheduleIndex < 0) return true;
+  return (selectedWeek - 1) * weeklySchedules.length + scheduleIndex + 1 <= totalSessions;
+};
+
 export function WeeklySchedulePage({ user }) {
   const [semesters, setSemesters] = useState([]);
   const [semesterId, setSemesterId] = useState("");
+  const [weekNumber, setWeekNumber] = useState("");
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -54,11 +129,28 @@ export function WeeklySchedulePage({ user }) {
       .finally(() => setLoading(false));
   }, [semesterId]);
 
+  const weekSemester = useMemo(() => {
+    if (!semesterId) return null;
+    return semesters.find((semester) => semester._id === semesterId);
+  }, [semesterId, semesters]);
+
+  const weeks = useMemo(() => buildSemesterWeeks(weekSemester), [weekSemester]);
+
+  useEffect(() => {
+    const currentWeek = findCurrentWeek(weeks);
+    const nextWeekNumber = currentWeek?.value || weeks[0]?.value || "";
+    setWeekNumber((current) => (weeks.some((week) => week.value === current) ? current : nextWeekNumber));
+  }, [weeks]);
+
   const cells = useMemo(() => {
     const map = {};
     items.forEach((assignment) => {
       const cls = assignment.class_id || {};
-      (cls.schedules || []).forEach((schedule) => {
+      if (semesterId && weekSemester && getClassSemesterId(cls) !== String(weekSemester._id)) return;
+
+      getWeeklySchedules(cls).forEach((schedule) => {
+        if (semesterId && !shouldShowScheduleInWeek(cls, schedule, weekNumber)) return;
+
         const start = Number(schedule.start_period);
         const end = Number(schedule.end_period);
         map[`${schedule.day_of_week}-${start}`] = {
@@ -69,7 +161,7 @@ export function WeeklySchedulePage({ user }) {
       });
     });
     return map;
-  }, [items]);
+  }, [items, semesterId, weekNumber, weekSemester]);
 
   const isCoveredByPreviousPeriod = (dayKey, period) =>
     Object.values(cells).some(({ schedule }) => {
@@ -93,9 +185,16 @@ export function WeeklySchedulePage({ user }) {
           <option>Thời khóa biểu cá nhân</option>
           <option>Thời khóa biểu bộ môn</option>
         </Select>
-        <Select label="Tuần">
-          <option>Tuần hiện tại</option>
-          <option>Tuần 44 [08/06/2026 - 14/06/2026]</option>
+        <Select label="Tuần" value={weekNumber} onChange={(e) => setWeekNumber(e.target.value)} disabled={!weeks.length}>
+          {!weeks.length && <option>{semesterId ? "Chưa có ngày học kỳ" : "Chọn học kỳ để xem tuần"}</option>}
+          {weeks.map((week) => {
+            const isCurrent = findCurrentWeek([week]);
+            return (
+              <option key={week.value} value={week.value}>
+                {`Tuần ${week.number}${isCurrent ? " (hiện tại)" : ""} [${formatShortDate(week.start)} - ${formatShortDate(week.end)}]`}
+              </option>
+            );
+          })}
         </Select>
         <label className="check-field">
           <input type="checkbox" /> Thời khóa biểu tối
@@ -121,14 +220,15 @@ export function WeeklySchedulePage({ user }) {
                   const course = cls.course_id || {};
                   return (
                     <td
-                      className={`schedule-cell ${cell ? "has-class" : ""}`}
+                      className={`schedule-cell ${cell ? `has-class ${sessionTypeClass(cell.schedule)}` : ""}`}
                       key={`${day.key}-${period}`}
                       rowSpan={cell?.rowSpan || 1}
                     >
                       {cell && (
                         <div className="schedule-class-block">
                           <strong>{courseTitle(course)}</strong>
-                          <span>Nhóm: {groupOfClass(cls.code)}</span>
+                          <span>Loại: {sessionTypeLabel(cell.schedule)}</span>
+                          <span>Nhóm: {cell.schedule.group_code || groupOfClass(cls.code)}</span>
                           <span>Phòng: {cell.schedule.room_id?.name || "N/A"}</span>
                           {user?.role !== "LECTURER" && <span>GV: {cell.assignment.lecturer_id?.name || "N/A"}</span>}
                         </div>

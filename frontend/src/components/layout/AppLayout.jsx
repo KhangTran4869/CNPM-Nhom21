@@ -12,7 +12,7 @@ export function AppLayout({ user, path, collapsed, onMenu, onLogout, navigate, c
           collapsed={collapsed}
           navigate={navigate}
         />
-        <main className="main-content">{children}</main>
+        <main className="main-content" key={path}>{children}</main>
       </div>
     </div>
   );

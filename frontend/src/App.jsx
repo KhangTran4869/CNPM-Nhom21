@@ -7,7 +7,7 @@ import { Input } from "./components/ui/Field";
 import { Modal } from "./components/ui/Modal";
 import { LoginPage } from "./pages/LoginPage";
 import { renderPage } from "./routes/AppRouter";
-import { api, tokenStore } from "./services/api";
+import { tokenStore } from "./services/api";
 import { authService } from "./services/authService";
 
 function currentPath() {
@@ -93,10 +93,11 @@ function App() {
     }
     setChangingPass(true);
     try {
-      const updatedUser = await api.post("/auth/change-password", {
+      await authService.changePassword({
         old_password: passForm.old_password || undefined,
         new_password: passForm.new_password,
       });
+      const updatedUser = await authService.getMe();
       setUser(updatedUser);
       setPassForm({ old_password: "", new_password: "", confirm_password: "" });
       alert("Đổi mật khẩu thành công! Bạn có thể tiếp tục sử dụng hệ thống.");

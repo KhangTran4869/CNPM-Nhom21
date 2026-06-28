@@ -5,13 +5,29 @@ import Schedule from "../models/Schedule.js";
 import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
 import mongoose from "mongoose";
 
-const validateSchedule = ({ day_of_week, start_period, end_period }) => {
+const SESSION_TYPES = ["THEORY", "PRACTICE"];
+
+const normalizeSessionType = (value) => String(value || "THEORY").trim().toUpperCase();
+
+const validateSchedule = ({ day_of_week, start_period, end_period, session_type }) => {
   const errors = [];
+  const normalizedSessionType = normalizeSessionType(session_type);
   if (Number(day_of_week) < 2 || Number(day_of_week) > 8) errors.push("DAY_OF_WEEK_INVALID");
   if (Number(start_period) <= 0) errors.push("START_PERIOD_INVALID");
   if (Number(end_period) < Number(start_period)) errors.push("END_PERIOD_INVALID");
+  if (!SESSION_TYPES.includes(normalizedSessionType)) errors.push("SESSION_TYPE_INVALID");
   return errors;
 };
+
+const schedulePayload = (body, classId) => ({
+  class_id: classId,
+  day_of_week: body.day_of_week,
+  start_period: body.start_period,
+  end_period: body.end_period,
+  room_id: body.room_id,
+  session_type: normalizeSessionType(body.session_type),
+  group_code: body.group_code?.trim() || null,
+});
 
 const classLocked = (classId) =>
   Assignment.exists({ class_id: classId, status: "APPROVED", is_deleted: false });
@@ -42,7 +58,9 @@ export const createSchedule = asyncHandler(async (req, res) => {
   if (await classLocked(classId)) errors.push("ASSIGNMENT_LOCKED");
   if (errors.length) return errorResponse(res, "Dữ liệu không hợp lệ", errors, errors.includes("ASSIGNMENT_LOCKED") ? 409 : 400);
 
-  const schedule = await Schedule.create({ class_id: classId, day_of_week, start_period, end_period, room_id });
+  const schedule = await Schedule.create(
+    schedulePayload({ ...req.body, day_of_week, start_period, end_period, room_id }, classId),
+  );
   return successResponse(res, schedule, "Tạo lịch học thành công", 201);
 });
 
@@ -55,7 +73,8 @@ export const updateSchedule = asyncHandler(async (req, res) => {
   const errors = validateSchedule({ ...existing.toObject(), ...req.body });
   if (errors.length) return errorResponse(res, "Dữ liệu không hợp lệ", errors, 400);
 
-  const schedule = await Schedule.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const nextPayload = schedulePayload({ ...existing.toObject(), ...req.body }, existing.class_id);
+  const schedule = await Schedule.findByIdAndUpdate(req.params.id, nextPayload, { new: true });
   return successResponse(res, schedule);
 });
 

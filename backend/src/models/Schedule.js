@@ -24,6 +24,16 @@ const scheduleSchema = new mongoose.Schema(
       ref: "Room",
       default: null,
     },
+    session_type: {
+      type: String,
+      enum: ["THEORY", "PRACTICE"],
+      default: "THEORY",
+    },
+    group_code: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     is_deleted: {
       type: Boolean,
       default: false,

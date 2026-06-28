@@ -12,6 +12,8 @@ export const lecturerService = {
     api.post(`/lecturers/${lecturerId}/availability`, data),
   updateAvailability: (id, data) => api.put(`/availability/${id}`, data),
   deleteAvailability: (id) => api.delete(`/availability/${id}`),
+  getLecturerWorkload: (lecturerId, params) =>
+    api.get(`/lecturers/${lecturerId}/workload`, params),
   getWorkload: (lecturerId, params) =>
     api.get(`/lecturers/${lecturerId}/workload`, params),
   getTeachingSchedule: (lecturerId, params) =>

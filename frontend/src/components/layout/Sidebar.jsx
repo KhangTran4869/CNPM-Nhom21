@@ -7,7 +7,7 @@ const menu = {
     { path: "/teaching-schedule/weekly", label: "Xem lịch dạy dạng tuần" },
     { path: "/teaching-schedule/semester", label: "Xem lịch dạy dạng học kỳ" },
     { path: "/availability", label: "Khai báo lịch bận / lịch rảnh" },
-    { path: "/reports", label: "Theo dõi số giờ giảng dạy" },
+    { path: "/reports", label: "Tải giảng dạy của tôi" },
     { path: "/profile", label: "Cập nhật thông tin cá nhân" },
     { path: "/classes", label: "Danh sách lớp tín chỉ" },
     { path: "/assignments", label: "Phân công của tôi" },
@@ -49,16 +49,21 @@ export function Sidebar({ role, activePath, collapsed, navigate }) {
         </div>
       </div>
       <nav>
-        {items.map((item, index) => (
-          <button
-            key={`${item.path}-${index}`}
-            className={`sidebar-item ${activePath === item.path ? "active" : ""}`}
-            onClick={() => navigate(item.path)}
-            type="button"
-          >
-            {item.label}
-          </button>
-        ))}
+        {items.map((item, index) => {
+          const isActive =
+            activePath === item.path ||
+            (activePath?.startsWith("/assignments") && item.path === "/assignments");
+          return (
+            <button
+              key={`${item.path}-${index}`}
+              className={`sidebar-item ${isActive ? "active" : ""}`}
+              onClick={() => navigate(item.path)}
+              type="button"
+            >
+              {item.label}
+            </button>
+          );
+        })}
       </nav>
     </aside>
   );
