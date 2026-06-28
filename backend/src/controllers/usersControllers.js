@@ -1,9 +1,11 @@
 import User from "../models/User.js";
 import Role from "../models/Role.js";
+import Lecturer from "../models/Lecturer.js";
 import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
 import { normalizeCode, USER_STATUSES } from "../utils/constants.js";
 import { hashPassword } from "../utils/password.js";
 
+// Hàm xây dựng bộ lọc tìm kiếm người dùng
 const buildUserQuery = (query) => {
   const filter = { is_deleted: false };
   if (query.status) filter.status = normalizeCode(query.status);
@@ -12,17 +14,42 @@ const buildUserQuery = (query) => {
   return filter;
 };
 
+/**
+ * Lấy danh sách tất cả tài khoản người dùng
+ * Bổ sung trường `role` (mã vai trò) và `lecturer_id` (nếu đã liên kết giảng viên)
+ */
 export const getAllUsers = asyncHandler(async (req, res) => {
   const page = Number(req.query.page || 1);
   const limit = Number(req.query.limit || 50);
-  const users = await User.find(buildUserQuery(req.query))
+
+  const rawUsers = await User.find(buildUserQuery(req.query))
     .populate("role_id")
     .sort({ createdAt: "desc" })
     .skip((page - 1) * limit)
-    .limit(limit);
+    .limit(limit)
+    .lean();
+
+  // Tìm các giảng viên đã liên kết tài khoản để map thông tin
+  const lecturers = await Lecturer.find({ is_deleted: false }, "_id user_id").lean();
+  const linkedMap = {};
+  lecturers.forEach((l) => {
+    if (l.user_id) linkedMap[String(l.user_id)] = l._id;
+  });
+
+  const users = rawUsers.map((u) => ({
+    ...u,
+    id: u._id,
+    role: u.role_id?.code || "USER",
+    lecturer_id: linkedMap[String(u._id)] || null,
+  }));
+
   return successResponse(res, users);
 });
 
+/**
+ * Tạo mới một tài khoản người dùng từ trang Admin
+ * Nếu mật khẩu đặt là 123456 -> bật cờ yêu cầu đổi mật khẩu lần đầu
+ */
 export const createUser = asyncHandler(async (req, res) => {
   const { username, password, role_id, status = "ACTIVE" } = req.body;
   const errors = [];
@@ -41,11 +68,17 @@ export const createUser = asyncHandler(async (req, res) => {
     status: normalizeCode(status),
     must_change_password: password === "123456",
   });
+
   return successResponse(res, user, "Tạo người dùng thành công", 201);
 });
 
+/**
+ * Cập nhật tài khoản người dùng (Sửa Vai trò, Trạng thái, hoặc Đặt lại mật khẩu)
+ */
 export const updateUser = asyncHandler(async (req, res) => {
   const updates = {};
+
+  // Nếu có nhập mật khẩu mới -> tiến hành băm (hash) và cập nhật
   if (req.body.password && req.body.password.trim() !== "") {
     if (req.body.password.length < 6) {
       return errorResponse(res, "Mật khẩu mới phải có ít nhất 6 ký tự", ["PASSWORD_MIN_6"], 400);
@@ -53,12 +86,14 @@ export const updateUser = asyncHandler(async (req, res) => {
     updates.password_hash = await hashPassword(req.body.password);
     updates.must_change_password = req.body.password === "123456";
   }
+
   if (req.body.role_id) {
     if (!(await Role.exists({ _id: req.body.role_id, is_deleted: false }))) {
       return errorResponse(res, "Dữ liệu không hợp lệ", ["ROLE_NOT_FOUND"], 400);
     }
     updates.role_id = req.body.role_id;
   }
+
   if (req.body.status) {
     const status = normalizeCode(req.body.status);
     if (!USER_STATUSES.includes(status)) {
@@ -72,10 +107,14 @@ export const updateUser = asyncHandler(async (req, res) => {
     updates,
     { new: true },
   ).populate("role_id");
+
   if (!user) return errorResponse(res, "Người dùng không tồn tại", ["USER_NOT_FOUND"], 404);
-  return successResponse(res, user);
+  return successResponse(res, user, "Cập nhật tài khoản thành công");
 });
 
+/**
+ * Xóa mềm tài khoản người dùng
+ */
 export const deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findOneAndUpdate(
     { _id: req.params.id, is_deleted: false },

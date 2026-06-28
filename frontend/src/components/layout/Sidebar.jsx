@@ -27,13 +27,16 @@ const menu = {
     { path: "/semesters", label: "Quản lý học kỳ" },
     { path: "/classes", label: "Quản lý lớp tín chỉ" },
     { path: "/rooms", label: "Quản lý phòng học" },
-    { path: "/assignments", label: "Phân công giảng viên" },
-    { path: "/assignments", label: "Duyệt phân công" },
+    { path: "/assignments", label: "Phân công & Duyệt giảng dạy" },
     { path: "/reports", label: "Báo cáo thống kê" },
     { path: "/assignment-history", label: "Lịch sử thay đổi phân công" },
   ],
 };
 
+/**
+ * Thanh điều hướng menu bên trái (Sidebar Navigation)
+ * Hiển thị các chức năng tương ứng theo đúng vai trò nghiệp vụ (ADMIN, HEAD, LECTURER)
+ */
 export function Sidebar({ role, activePath, collapsed, navigate }) {
   const items = [...menu.common, ...(menu[role] || [])];
   return (

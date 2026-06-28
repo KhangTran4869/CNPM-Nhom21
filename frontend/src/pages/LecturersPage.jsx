@@ -9,6 +9,7 @@ import { api } from "../services/api";
 import { catalogService } from "../services/catalogService";
 import { lecturerService } from "../services/lecturerService";
 
+// Mẫu dữ liệu mặc định khi thêm giảng viên mới
 const emptyForm = {
   code: "",
   name: "",
@@ -22,6 +23,7 @@ const emptyForm = {
   status: "ACTIVE",
 };
 
+// Map dữ liệu từ đối tượng giảng viên sang form chỉnh sửa
 const toLecturerForm = (lecturer) => ({
   code: lecturer?.code || "",
   name: lecturer?.name || "",
@@ -35,6 +37,10 @@ const toLecturerForm = (lecturer) => ({
   status: lecturer?.status || "ACTIVE",
 });
 
+/**
+ * Trang Quản lý Giảng viên
+ * Hiển thị danh sách, tìm kiếm lọc theo bộ môn, thêm/sửa/xóa thông tin giảng viên và khoa trực thuộc
+ */
 export function LecturersPage({ user }) {
   const [lecturers, setLecturers] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -49,7 +55,11 @@ export function LecturersPage({ user }) {
 
   const load = () => {
     setLoading(true);
-    lecturerService.getLecturers(filters).then(setLecturers).catch(() => setLecturers([])).finally(() => setLoading(false));
+    lecturerService
+      .getLecturers(filters)
+      .then(setLecturers)
+      .catch(() => setLecturers([]))
+      .finally(() => setLoading(false));
   };
 
   const loadDepartments = () =>
@@ -64,17 +74,19 @@ export function LecturersPage({ user }) {
         return [];
       });
 
+  // Chỉ tải danh sách User khi người đăng nhập là Admin (tránh lỗi 403 Forbidden cho Trưởng khoa)
   const loadUsers = () => {
     api.get("/users").then((data) => setUsers(data || [])).catch(() => setUsers([]));
   };
 
   useEffect(() => {
     loadDepartments();
-    loadUsers();
-  }, []);
+    if (isAdmin) loadUsers();
+  }, [isAdmin]);
 
   useEffect(load, [filters]);
 
+  // Xử lý gửi form Thêm mới hoặc Cập nhật Giảng viên
   const submit = async (event) => {
     event.preventDefault();
     setError("");
@@ -95,12 +107,12 @@ export function LecturersPage({ user }) {
       setForm(emptyForm);
       setSelectedLecturer(null);
       load();
-      loadUsers();
+      if (isAdmin) loadUsers();
     } catch (err) {
       setError(
         err.payload?.errors?.map((item) => item.message || item.rule || item).join(", ") ||
           err.message ||
-          "Không thể tạo giảng viên",
+          "Không thể lưu thông tin giảng viên",
       );
     }
   };
@@ -132,7 +144,7 @@ export function LecturersPage({ user }) {
   };
 
   const remove = async (id) => {
-    if (window.confirm("Xóa giảng viên này?")) {
+    if (window.confirm("Bạn có chắc chắn muốn xóa giảng viên này?")) {
       await lecturerService.deleteLecturer(id);
       load();
     }
@@ -146,7 +158,7 @@ export function LecturersPage({ user }) {
     { key: "degree", title: "Học vị" },
     { key: "faculty", title: "Khoa", render: (row) => row.faculty || "Khoa Công nghệ thông tin" },
     { key: "department", title: "Bộ môn", render: (row) => row.department_id?.name || "Chưa cập nhật" },
-    { key: "account", title: "Tài khoản", render: (row) => row.user_id?.username || "Chưa có" },
+    { key: "account", title: "Tài khoản", render: (row) => row.user_id?.username || "Chưa kết nối" },
     { key: "max_hours", title: "Max hours" },
     { key: "status", title: "Trạng thái", render: (row) => <Badge>{row.status}</Badge> },
     {
@@ -169,9 +181,9 @@ export function LecturersPage({ user }) {
         actions={isAdmin && <Button onClick={openCreate}>Thêm giảng viên</Button>}
       >
         <div className="filter-row">
-          <Input label="Tìm kiếm" value={filters.keyword} onChange={(e) => setFilters({ ...filters, keyword: e.target.value })} />
+          <Input label="Tìm kiếm" value={filters.keyword} onChange={(e) => setFilters({ ...filters, keyword: e.target.value })} placeholder="Tên, mã GV..." />
           <Select label="Bộ môn" value={filters.department_id} onChange={(e) => setFilters({ ...filters, department_id: e.target.value })}>
-            <option value="">Tất cả</option>
+            <option value="">Tất cả bộ môn</option>
             {departments.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
           </Select>
           <Select label="Trạng thái" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
@@ -183,6 +195,8 @@ export function LecturersPage({ user }) {
         </div>
         <Table columns={columns} rows={lecturers} loading={loading} />
       </Card>
+
+      {/* Modal hiển thị chi tiết giảng viên */}
       <Modal title={modal === "Chi tiết giảng viên" ? modal : ""} onClose={() => setModal("")}>
         <div className="form-grid">
           <label className="field">
@@ -206,11 +220,15 @@ export function LecturersPage({ user }) {
             <div className="alert">{selectedLecturer?.degree || "N/A"}</div>
           </label>
           <label className="field">
+            <span>Khoa trực thuộc</span>
+            <div className="alert">{selectedLecturer?.faculty || "Khoa Công nghệ thông tin"}</div>
+          </label>
+          <label className="field">
             <span>Bộ môn</span>
             <div className="alert">{selectedLecturer?.department_id?.name || "Chưa cập nhật"}</div>
           </label>
           <label className="field">
-            <span>Max hours</span>
+            <span>Giờ chuẩn tối đa</span>
             <div className="alert">{selectedLecturer?.max_hours ?? "N/A"}</div>
           </label>
           <label className="field">
@@ -231,14 +249,15 @@ export function LecturersPage({ user }) {
         </div>
       </Modal>
 
+      {/* Modal Thêm hoặc Sửa giảng viên */}
       <Modal title={modal === "Thêm giảng viên" || modal === "Sửa giảng viên" ? modal : ""} onClose={() => setModal("")}>
         <form className="form-grid" onSubmit={submit}>
           <Input label="Mã GV" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={modal === "Sửa giảng viên"} placeholder="VD: GV001 (Để trống sẽ tự tạo)" />
           <Input label="Họ tên" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <Input label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <Input label="Số điện thoại" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          <Input label="Học vị" value={form.degree} onChange={(e) => setForm({ ...form, degree: e.target.value })} />
-          <Input label="Khoa" value={form.faculty} onChange={(e) => setForm({ ...form, faculty: e.target.value })} placeholder="VD: Khoa Công nghệ thông tin" />
+          <Input label="Học vị" value={form.degree} onChange={(e) => setForm({ ...form, degree: e.target.value })} placeholder="ThS, TS, PGS.TS..." />
+          <Input label="Khoa trực thuộc" value={form.faculty} onChange={(e) => setForm({ ...form, faculty: e.target.value })} placeholder="VD: Khoa Công nghệ thông tin" />
           <Select label="Bộ môn" value={form.department_id} onChange={(e) => setForm({ ...form, department_id: e.target.value })}>
             <option value="">{departments.length ? "Chọn bộ môn" : "Chưa có bộ môn"}</option>
             {departments.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
@@ -246,17 +265,17 @@ export function LecturersPage({ user }) {
           <Select label="Tài khoản đăng nhập liên kết" value={form.user_id} onChange={(e) => setForm({ ...form, user_id: e.target.value })}>
             <option value="">Tự động tạo mới (Username = Mã GV, Pass = 123456)</option>
             {users.filter(u => !u.lecturer_id && u.role !== "ADMIN").map((u) => (
-              <option key={u._id} value={u._id}>{u.username} ({u.role || "USER"})</option>
+              <option key={u.id || u._id} value={u.id || u._id}>{u.username} ({u.role || "USER"})</option>
             ))}
           </Select>
-          <Input label="Max hours" type="number" value={form.max_hours} onChange={(e) => setForm({ ...form, max_hours: Number(e.target.value) })} />
+          <Input label="Giờ chuẩn tối đa" type="number" value={form.max_hours} onChange={(e) => setForm({ ...form, max_hours: Number(e.target.value) })} />
           <Select label="Trạng thái" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
             <option value="ACTIVE">ACTIVE</option>
             <option value="BUSY">BUSY</option>
             <option value="INACTIVE">INACTIVE</option>
           </Select>
           {error && <div className="alert danger">{error}</div>}
-          <Button className="form-submit" type="submit">Lưu</Button>
+          <Button className="form-submit" type="submit">Lưu thông tin</Button>
         </form>
       </Modal>
     </>

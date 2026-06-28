@@ -9,17 +9,31 @@ import { LECTURER_STATUSES, normalizeCode } from "../utils/constants.js";
 import { hashPassword } from "../utils/password.js";
 import { getCurrentHours } from "../services/conflictService.js";
 
+// Kiểm tra quyền sở hữu giảng viên (dành cho role LECTURER tự cập nhật chính mình)
 const ownLecturer = (req, id) => req.lecturer && String(req.lecturer._id) === String(id);
 
+/**
+ * Đảm bảo giảng viên có tài khoản đăng nhập hợp lệ
+ * - Nếu truyền user_id có sẵn: kiểm tra tồn tại và gán quyền LECTURER cho user đó
+ * - Nếu không truyền: tự động tạo tài khoản (Username = Mã GV, Mật khẩu = 123456)
+ */
 const ensureLecturerUser = async ({ code, user_id }) => {
   if (user_id) {
     const user = await User.findOne({ _id: user_id, is_deleted: false }).populate("role_id");
     if (!user) return { error: "USER_NOT_FOUND" };
     const linked = await Lecturer.exists({ user_id: user._id, is_deleted: false });
     if (linked) return { error: "USER_ALREADY_LINKED" };
+
+    // Đảm bảo user được gán đúng role LECTURER
+    const lecturerRole = await Role.findOne({ code: "LECTURER", is_deleted: false });
+    if (lecturerRole && String(user.role_id?._id || user.role_id) !== String(lecturerRole._id)) {
+      user.role_id = lecturerRole._id;
+      await user.save();
+    }
     return { user };
   }
 
+  // Lấy hoặc tạo Role LECTURER
   const lecturerRole = await Role.findOneAndUpdate(
     { code: "LECTURER" },
     { code: "LECTURER", name: "Giảng viên", is_deleted: false },
@@ -47,6 +61,9 @@ const ensureLecturerUser = async ({ code, user_id }) => {
   return { user };
 };
 
+/**
+ * Lấy danh sách giảng viên (lọc theo bộ môn, trạng thái, từ khóa)
+ */
 export const getAllLecturers = asyncHandler(async (req, res) => {
   const filter = { is_deleted: false };
   if (req.query.department_id) filter.department_id = req.query.department_id;
@@ -68,8 +85,24 @@ export const getAllLecturers = asyncHandler(async (req, res) => {
   return successResponse(res, lecturers);
 });
 
+/**
+ * Thêm giảng viên mới (hỗ trợ tự động sinh mã GV001 nếu bỏ trống)
+ */
 export const createLecturer = asyncHandler(async (req, res) => {
-  let { code, name, email, phone, degree, faculty = "Khoa Công nghệ thông tin", department_id, user_id, max_hours, status = "ACTIVE" } = req.body;
+  let {
+    code,
+    name,
+    email,
+    phone,
+    degree,
+    faculty = "Khoa Công nghệ thông tin",
+    department_id,
+    user_id,
+    max_hours,
+    status = "ACTIVE",
+  } = req.body;
+
+  // Thuật toán tự sinh mã GV001, GV002... tuần tự nếu để trống
   if (!code || code.trim() === "") {
     const count = await Lecturer.countDocuments();
     let nextNum = count + 1;
@@ -94,6 +127,7 @@ export const createLecturer = asyncHandler(async (req, res) => {
 
   const department = await Department.findOne({ _id: department_id, is_deleted: false });
   if (!department) return errorResponse(res, "Bộ môn không tồn tại", ["DEPARTMENT_NOT_FOUND"], 400);
+
   const account = await ensureLecturerUser({ code, user_id });
   if (account.error) return errorResponse(res, "Dữ liệu không hợp lệ", [account.error], 400);
 
@@ -113,6 +147,9 @@ export const createLecturer = asyncHandler(async (req, res) => {
   return successResponse(res, populated, "Tạo giảng viên thành công", 201);
 });
 
+/**
+ * Cập nhật thông tin giảng viên (Khoa, bộ môn, học vị, liên kết user)
+ */
 export const updateLecturer = asyncHandler(async (req, res) => {
   if (req.userRole === "LECTURER" && !ownLecturer(req, req.params.id)) {
     return errorResponse(res, "Không có quyền", ["FORBIDDEN"], 403);
@@ -135,15 +172,35 @@ export const updateLecturer = asyncHandler(async (req, res) => {
   }
   if (updates.status) updates.status = normalizeCode(updates.status);
 
+  // Nếu Admin cập nhật liên kết user mới -> kiểm tra trùng lặp và cập nhật role user
+  if (updates.user_id) {
+    const linked = await Lecturer.exists({
+      user_id: updates.user_id,
+      _id: { $ne: req.params.id },
+      is_deleted: false,
+    });
+    if (linked) {
+      return errorResponse(res, "Tài khoản này đã liên kết với giảng viên khác", ["USER_ALREADY_LINKED"], 400);
+    }
+    const lecturerRole = await Role.findOne({ code: "LECTURER", is_deleted: false });
+    if (lecturerRole) {
+      await User.findOneAndUpdate({ _id: updates.user_id }, { role_id: lecturerRole._id });
+    }
+  }
+
   const lecturer = await Lecturer.findOneAndUpdate(
     { _id: req.params.id, is_deleted: false },
     updates,
     { new: true },
-  );
+  ).populate("department_id user_id");
+
   if (!lecturer) return errorResponse(res, "Giảng viên không tồn tại", ["LECTURER_NOT_FOUND"], 404);
-  return successResponse(res, lecturer);
+  return successResponse(res, lecturer, "Cập nhật giảng viên thành công");
 });
 
+/**
+ * Cập nhật giờ chuẩn tối đa
+ */
 export const updateMaxHours = asyncHandler(async (req, res) => {
   const lecturer = await Lecturer.findOneAndUpdate(
     { _id: req.params.id, is_deleted: false },
@@ -154,6 +211,9 @@ export const updateMaxHours = asyncHandler(async (req, res) => {
   return successResponse(res, lecturer);
 });
 
+/**
+ * Cập nhật trạng thái giảng viên
+ */
 export const updateLecturerStatus = asyncHandler(async (req, res) => {
   const status = normalizeCode(req.body.status);
   if (!LECTURER_STATUSES.includes(status)) {
@@ -168,6 +228,9 @@ export const updateLecturerStatus = asyncHandler(async (req, res) => {
   return successResponse(res, lecturer);
 });
 
+/**
+ * Tính toán tải giảng dạy (Workload) hiện tại của giảng viên trong học kỳ
+ */
 export const getWorkload = asyncHandler(async (req, res) => {
   if (!req.query.semester_id) {
     return errorResponse(res, "Dữ liệu không hợp lệ", ["SEMESTER_REQUIRED"], 400);
@@ -188,6 +251,9 @@ export const getWorkload = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Xóa mềm giảng viên (Từ chối nếu đang có phân công giảng dạy đã duyệt)
+ */
 export const deleteLecturer = asyncHandler(async (req, res) => {
   const hasApproved = await Assignment.exists({
     lecturer_id: req.params.id,

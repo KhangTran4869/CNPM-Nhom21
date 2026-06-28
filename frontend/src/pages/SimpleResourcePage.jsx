@@ -7,6 +7,7 @@ import { Table } from "../components/ui/Table";
 import { api } from "../services/api";
 import { catalogService } from "../services/catalogService";
 
+// Cấu trúc cấu hình cho các trang quản lý danh mục đơn giản
 const configs = {
   users: {
     title: "Quản lý tài khoản",
@@ -65,50 +66,52 @@ const configs = {
   },
 };
 
+/**
+ * Component quản lý danh mục dùng chung (Tài khoản, Bộ môn, Môn học, Phòng, Học kỳ...)
+ */
 export function SimpleResourcePage({ type }) {
   const config = configs[type];
   const [rows, setRows] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [roles, setRoles] = useState([]);
-  const [keyword, setKeyword] = useState("");
   const [loading, setLoading] = useState(false);
   const [modal, setModal] = useState("");
   const [error, setError] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
 
-  const [courseForm, setCourseForm] = useState({
-    code: "",
-    name: "",
-    credits: 3,
-    department_id: "",
-  });
-  const [semesterForm, setSemesterForm] = useState({
-    name: "",
-    start_date: "",
-    end_date: "",
-  });
+  // States lưu dữ liệu form cho các danh mục
+  const [courseForm, setCourseForm] = useState({ code: "", name: "", credits: 3, department_id: "" });
   const [roomForm, setRoomForm] = useState({ name: "", capacity: 80 });
+  const [semesterForm, setSemesterForm] = useState({ name: "", start_date: "", end_date: "" });
   const [userForm, setUserForm] = useState({ username: "", password: "", role_id: "", status: "ACTIVE" });
   const [departmentForm, setDepartmentForm] = useState({ code: "", name: "", description: "" });
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get(config.path, { keyword }).then(setRows).catch(() => setRows([])).finally(() => setLoading(false));
-  }, [config.path, keyword]);
+    api
+      .get(config.path)
+      .then((data) => setRows(Array.isArray(data) ? data : data?.items || []))
+      .catch(() => setRows([]))
+      .finally(() => setLoading(false));
+  }, [config.path]);
 
   useEffect(() => {
     load();
-  }, [load]);
-
-  useEffect(() => {
-    if (type === "courses") {
-      catalogService.getDepartments().then(setDepartments).catch(() => setDepartments([]));
+    if (type === "courses" || type === "departments") {
+      catalogService.getDepartments().then((data) => {
+        setDepartments(data || []);
+        setCourseForm((prev) => ({ ...prev, department_id: data?.[0]?._id || "" }));
+      }).catch(() => setDepartments([]));
     }
     if (type === "users") {
-      catalogService.getRoles().then(setRoles).catch(() => setRoles([]));
+      catalogService.getRoles().then((data) => {
+        setRoles(data || []);
+        setUserForm((prev) => ({ ...prev, role_id: data?.[0]?._id || "" }));
+      }).catch(() => setRoles([]));
     }
-  }, [type]);
+  }, [load, type]);
 
+  // Xử lý mở modal Chỉnh sửa thông tin
   const openEdit = (row) => {
     setError("");
     setSelectedItem(row);
@@ -131,6 +134,7 @@ export function SimpleResourcePage({ type }) {
     }
   };
 
+  // Thêm cột nút Hành động (Sửa) cho danh mục User và Department
   const columns = useMemo(() => {
     const cols = [...config.columns];
     if (type === "users" || type === "departments") {
@@ -162,10 +166,11 @@ export function SimpleResourcePage({ type }) {
     setError("");
     setSelectedItem(null);
     setModal(modalTitle);
-    if (type === "users") setUserForm({ username: "", password: "", role_id: "", status: "ACTIVE" });
+    if (type === "users") setUserForm({ username: "", password: "", role_id: roles?.[0]?._id || "", status: "ACTIVE" });
     if (type === "departments") setDepartmentForm({ code: "", name: "", description: "" });
   };
 
+  // Xử lý Thêm mới hoặc Cập nhật bản ghi danh mục
   const createItem = async (event) => {
     event.preventDefault();
     setError("");
@@ -179,7 +184,7 @@ export function SimpleResourcePage({ type }) {
       } else {
         if (type === "courses") {
           await api.post("/courses", courseForm);
-          setCourseForm({ code: "", name: "", credits: 3, department_id: "" });
+          setCourseForm({ code: "", name: "", credits: 3, department_id: departments?.[0]?._id || "" });
         }
         if (type === "rooms") {
           await api.post("/rooms", roomForm);
@@ -191,7 +196,7 @@ export function SimpleResourcePage({ type }) {
         }
         if (type === "users") {
           await api.post("/users", userForm);
-          setUserForm({ username: "", password: "", role_id: "", status: "ACTIVE" });
+          setUserForm({ username: "", password: "", role_id: roles?.[0]?._id || "", status: "ACTIVE" });
         }
         if (type === "departments") {
           await api.post("/departments", departmentForm);
@@ -213,18 +218,11 @@ export function SimpleResourcePage({ type }) {
     <>
       <Card
         title={config.title}
-        actions={
-          <div className="row-actions">
-            {canCreate && <Button onClick={openCreate}>Thêm mới</Button>}
-            <Button variant="outline" onClick={load}>Làm mới</Button>
-          </div>
-        }
+        actions={canCreate && <Button onClick={openCreate}>{modalTitle}</Button>}
       >
-        <div className="filter-row">
-          <Input label="Tìm kiếm" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
-        </div>
         <Table columns={columns} rows={rows} loading={loading} />
       </Card>
+
       <Modal title={modal} onClose={() => setModal("")}>
         <form className="form-grid" onSubmit={createItem}>
           {type === "courses" && (
@@ -232,50 +230,52 @@ export function SimpleResourcePage({ type }) {
               <Input label="Mã môn" value={courseForm.code} onChange={(e) => setCourseForm({ ...courseForm, code: e.target.value })} required />
               <Input label="Tên môn" value={courseForm.name} onChange={(e) => setCourseForm({ ...courseForm, name: e.target.value })} required />
               <Input label="Số tín chỉ" type="number" value={courseForm.credits} onChange={(e) => setCourseForm({ ...courseForm, credits: Number(e.target.value) })} required />
-              <Select label="Bộ môn" value={courseForm.department_id} onChange={(e) => setCourseForm({ ...courseForm, department_id: e.target.value })}>
+              <Select label="Bộ môn" value={courseForm.department_id} onChange={(e) => setCourseForm({ ...courseForm, department_id: e.target.value })} required>
                 <option value="">Chọn bộ môn</option>
-                {departments.map((department) => (
-                  <option key={department._id} value={department._id}>{department.name}</option>
-                ))}
+                {departments.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
               </Select>
             </>
           )}
+
           {type === "rooms" && (
             <>
               <Input label="Tên phòng" value={roomForm.name} onChange={(e) => setRoomForm({ ...roomForm, name: e.target.value })} required />
               <Input label="Sức chứa" type="number" value={roomForm.capacity} onChange={(e) => setRoomForm({ ...roomForm, capacity: Number(e.target.value) })} required />
             </>
           )}
+
           {type === "semesters" && (
             <>
-              <Input label="Tên học kỳ" value={semesterForm.name} onChange={(e) => setSemesterForm({ ...semesterForm, name: e.target.value })} required />
-              <Input label="Ngày bắt đầu" type="date" value={semesterForm.start_date} onChange={(e) => setSemesterForm({ ...semesterForm, start_date: e.target.value })} />
-              <Input label="Ngày kết thúc" type="date" value={semesterForm.end_date} onChange={(e) => setSemesterForm({ ...semesterForm, end_date: e.target.value })} />
+              <Input label="Tên học kỳ" value={semesterForm.name} onChange={(e) => setSemesterForm({ ...semesterForm, name: e.target.value })} required placeholder="VD: Học kỳ 1 2026-2027" />
+              <Input label="Ngày bắt đầu" type="date" value={semesterForm.start_date} onChange={(e) => setSemesterForm({ ...semesterForm, start_date: e.target.value })} required />
+              <Input label="Ngày kết thúc" type="date" value={semesterForm.end_date} onChange={(e) => setSemesterForm({ ...semesterForm, end_date: e.target.value })} required />
             </>
           )}
+
           {type === "users" && (
             <>
               <Input label="Tên đăng nhập" value={userForm.username} onChange={(e) => setUserForm({ ...userForm, username: e.target.value })} required disabled={modal === "Sửa tài khoản"} placeholder="VD: giangvien_a" />
               <Input label={modal === "Sửa tài khoản" ? "Mật khẩu mới (Để trống nếu không đổi)" : "Mật khẩu"} type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} required={modal !== "Sửa tài khoản"} minLength={modal === "Sửa tài khoản" && !userForm.password ? undefined : 6} placeholder="Ít nhất 6 ký tự" />
-              <Select label="Vai trò" value={userForm.role_id} onChange={(e) => setUserForm({ ...userForm, role_id: e.target.value })} required>
+              <Select label="Vai trò (Role)" value={userForm.role_id} onChange={(e) => setUserForm({ ...userForm, role_id: e.target.value })} required>
                 <option value="">Chọn vai trò</option>
-                {roles.map((r) => (
-                  <option key={r._id} value={r._id}>{r.name} ({r.code})</option>
-                ))}
+                {roles.map((r) => <option key={r._id} value={r._id}>{r.name} ({r.code})</option>)}
               </Select>
               <Select label="Trạng thái" value={userForm.status} onChange={(e) => setUserForm({ ...userForm, status: e.target.value })}>
                 <option value="ACTIVE">ACTIVE</option>
                 <option value="INACTIVE">INACTIVE</option>
+                <option value="LOCKED">LOCKED</option>
               </Select>
             </>
           )}
+
           {type === "departments" && (
             <>
-              <Input label="Mã bộ môn" value={departmentForm.code} onChange={(e) => setDepartmentForm({ ...departmentForm, code: e.target.value })} required placeholder="VD: KHMT" />
-              <Input label="Tên bộ môn" value={departmentForm.name} onChange={(e) => setDepartmentForm({ ...departmentForm, name: e.target.value })} required placeholder="VD: Khoa học máy tính" />
-              <Input label="Mô tả" value={departmentForm.description} onChange={(e) => setDepartmentForm({ ...departmentForm, description: e.target.value })} placeholder="VD: Quản lý các học phần chuyên ngành" />
+              <Input label="Mã bộ môn" value={departmentForm.code} onChange={(e) => setDepartmentForm({ ...departmentForm, code: e.target.value })} required disabled={modal === "Sửa bộ môn"} placeholder="VD: CNPM" />
+              <Input label="Tên bộ môn" value={departmentForm.name} onChange={(e) => setDepartmentForm({ ...departmentForm, name: e.target.value })} required placeholder="VD: Công nghệ phần mềm" />
+              <Input label="Mô tả chi tiết" value={departmentForm.description} onChange={(e) => setDepartmentForm({ ...departmentForm, description: e.target.value })} placeholder="VD: Quản lý các môn chuyên ngành phần mềm" />
             </>
           )}
+
           {error && <div className="alert danger">{error}</div>}
           <Button className="form-submit" type="submit">Lưu</Button>
         </form>
@@ -286,16 +286,18 @@ export function SimpleResourcePage({ type }) {
 
 export function ForbiddenPage() {
   return (
-    <Card title="403">
-      <div className="empty-page">Bạn không có quyền truy cập chức năng này.</div>
+    <Card title="Không có quyền truy cập">
+      <div className="empty-state">
+        Bạn không có đủ quyền hạn (Role) để truy cập hoặc thực hiện thao tác trên màn hình này.
+      </div>
     </Card>
   );
 }
 
-export function ComingSoonPage({ title = "Chức năng đang hoàn thiện" }) {
+export function ComingSoonPage({ title }) {
   return (
     <Card title={title}>
-      <div className="empty-page">Màn hình này đã được đặt trong menu và sẵn sàng mở rộng.</div>
+      <div className="empty-state">Tính năng đang trong quá trình phát triển hoàn thiện.</div>
     </Card>
   );
 }

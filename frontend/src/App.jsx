@@ -2,53 +2,30 @@ import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import "./styles/uis-theme.css";
 import { AppLayout } from "./components/layout/AppLayout";
-import { authService } from "./services/authService";
-import { api, tokenStore } from "./services/api";
-import { LoginPage } from "./pages/LoginPage";
-import { HomePage } from "./pages/HomePage";
-import { WeeklySchedulePage } from "./pages/WeeklySchedulePage";
-import { LecturersPage } from "./pages/LecturersPage";
-import { ClassesPage } from "./pages/ClassesPage";
-import { AssignmentsPage } from "./pages/AssignmentsPage";
-import { AvailabilityPage } from "./pages/AvailabilityPage";
-import { ReportsPage } from "./pages/ReportsPage";
-import { ProfilePage } from "./pages/ProfilePage";
-import { ComingSoonPage, ForbiddenPage, SimpleResourcePage } from "./pages/SimpleResourcePage";
-import { Modal } from "./components/ui/Modal";
-import { Input } from "./components/ui/Field";
 import { Button } from "./components/ui/Button";
-
-const routeRoles = {
-  "/home": ["ADMIN", "HEAD", "LECTURER"],
-  "/teaching-schedule/weekly": ["LECTURER", "ADMIN", "HEAD"],
-  "/teaching-schedule/semester": ["LECTURER", "ADMIN", "HEAD"],
-  "/lecturers": ["ADMIN", "HEAD"],
-  "/classes": ["ADMIN", "HEAD", "LECTURER"],
-  "/assignments": ["ADMIN", "HEAD", "LECTURER"],
-  "/availability": ["ADMIN", "LECTURER"],
-  "/reports": ["ADMIN", "HEAD", "LECTURER"],
-  "/users": ["ADMIN"],
-  "/courses": ["ADMIN"],
-  "/semesters": ["ADMIN"],
-  "/rooms": ["ADMIN"],
-  "/departments": ["ADMIN"],
-  "/assignment-history": ["ADMIN", "HEAD"],
-  "/notifications": ["ADMIN", "HEAD", "LECTURER"],
-  "/profile": ["LECTURER", "HEAD"],
-};
+import { Input } from "./components/ui/Field";
+import { Modal } from "./components/ui/Modal";
+import { LoginPage } from "./pages/LoginPage";
+import { renderPage } from "./routes/AppRouter";
+import { api, tokenStore } from "./services/api";
+import { authService } from "./services/authService";
 
 function currentPath() {
   const path = window.location.pathname;
   return path === "/" ? "/home" : path;
 }
 
+/**
+ * Component gốc của ứng dụng (Root Application Component)
+ * Quản lý trạng thái đăng nhập (Authentication), điều hướng Router và Modal bắt buộc đổi mật khẩu
+ */
 function App() {
   const [path, setPath] = useState(currentPath());
   const [user, setUser] = useState(null);
   const [booting, setBooting] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
 
-  // Password forced change state
+  // States quản lý đổi mật khẩu bắt buộc lần đầu cho Giảng viên / Trưởng khoa
   const [passForm, setPassForm] = useState({ old_password: "", new_password: "", confirm_password: "" });
   const [passError, setPassError] = useState("");
   const [changingPass, setChangingPass] = useState(false);
@@ -91,28 +68,9 @@ function App() {
       .finally(() => setBooting(false));
   }, []);
 
+  // Điều phối Component theo đường dẫn và Role của người dùng
   const page = useMemo(() => {
-    if (!user && path !== "/login") return null;
-    const allowed = routeRoles[path];
-    if (allowed && !allowed.includes(user?.role)) return <ForbiddenPage />;
-
-    if (path === "/home") return <HomePage user={user} navigate={navigate} />;
-    if (path === "/teaching-schedule/weekly") return <WeeklySchedulePage user={user} />;
-    if (path === "/teaching-schedule/semester") return <ComingSoonPage title="Thời khóa biểu dạng học kỳ" />;
-    if (path === "/lecturers") return <LecturersPage user={user} />;
-    if (path === "/classes") return <ClassesPage user={user} />;
-    if (path === "/assignments") return <AssignmentsPage user={user} />;
-    if (path === "/availability") return <AvailabilityPage user={user} />;
-    if (path === "/reports") return <ReportsPage user={user} />;
-    if (path === "/users") return <SimpleResourcePage type="users" />;
-    if (path === "/departments") return <SimpleResourcePage type="departments" />;
-    if (path === "/courses") return <SimpleResourcePage type="courses" />;
-    if (path === "/semesters") return <SimpleResourcePage type="semesters" />;
-    if (path === "/rooms") return <SimpleResourcePage type="rooms" />;
-    if (path === "/assignment-history") return <SimpleResourcePage type="history" />;
-    if (path === "/notifications") return <ComingSoonPage title="Thông báo từ ban quản trị" />;
-    if (path === "/profile") return <ProfilePage user={user} onUserChange={setUser} />;
-    return <HomePage user={user} navigate={navigate} />;
+    return renderPage({ path, user, navigate, setUser });
   }, [path, user]);
 
   const onLogin = (nextUser) => {
@@ -135,7 +93,7 @@ function App() {
     }
     setChangingPass(true);
     try {
-      const updatedUser = await api.post("/change-password", {
+      const updatedUser = await api.post("/auth/change-password", {
         old_password: passForm.old_password || undefined,
         new_password: passForm.new_password,
       });
@@ -167,7 +125,8 @@ function App() {
     >
       {page}
 
-      {user?.must_change_password && (
+      {/* Modal yêu cầu đổi mật khẩu lần đầu (chỉ hiển thị cho Trưởng khoa & Giảng viên) */}
+      {user?.must_change_password && user?.role !== "ADMIN" && (
         <Modal title="Yêu cầu đổi mật khẩu lần đầu" onClose={() => {}}>
           <div style={{ marginBottom: "16px", color: "var(--text-secondary)", fontSize: "14px" }}>
             Tài khoản của bạn đang sử dụng mật khẩu mặc định (123456). Vì lý do bảo mật, vui lòng đặt lại mật khẩu mới trước khi tiếp tục.
@@ -201,7 +160,7 @@ function App() {
             />
             {passError && <div className="alert danger">{passError}</div>}
             <Button className="form-submit" type="submit" disabled={changingPass}>
-              {changingPass ? "Đang đổi mật khẩu..." : "Cập nhật mật khẩu"}
+              {changingPass ? "Đang xử lý..." : "Cập nhật mật khẩu"}
             </Button>
           </form>
         </Modal>

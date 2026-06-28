@@ -5,17 +5,24 @@ import { roleCodeOf } from "../utils/constants.js";
 import { signToken } from "../utils/jwt.js";
 import { hashPassword, verifyPassword } from "../utils/password.js";
 
+/**
+ * Chuẩn hóa thông tin User trả về cho Client
+ * Tự động tìm thông tin Giảng viên liên kết (nếu có) để map họ tên, khoa, bộ môn
+ */
 const publicUser = async (user) => {
   const lecturer = await Lecturer.findOne({ user_id: user._id, is_deleted: false })
     .populate("department_id")
     .lean();
 
+  const roleCode = roleCodeOf(user);
+
   return {
     id: user._id,
     username: user.username,
-    role: roleCodeOf(user),
+    role: roleCode,
     status: user.status,
-    must_change_password: user.must_change_password || false,
+    // Admin không bao giờ bị bắt buộc đổi mật khẩu
+    must_change_password: roleCode === "ADMIN" ? false : (user.must_change_password || false),
     lecturer_id: lecturer?._id || null,
     name: lecturer?.name || user.username,
     code: lecturer?.code || null,
@@ -30,6 +37,10 @@ const publicUser = async (user) => {
   };
 };
 
+/**
+ * API Đăng nhập hệ thống
+ * Khi Giảng viên hoặc Trưởng khoa đăng nhập lần đầu bằng mật khẩu mặc định (123456) -> kích hoạt cờ must_change_password
+ */
 export const login = asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
@@ -46,12 +57,20 @@ export const login = asyncHandler(async (req, res) => {
     return errorResponse(res, "Tên đăng nhập hoặc mật khẩu không đúng", ["INVALID_CREDENTIALS"], 401);
   }
 
-  if (password === "123456" && !user.must_change_password) {
+  const roleCode = roleCodeOf(user);
+  // Admin không cần yêu cầu đổi mật khẩu lần đầu (nếu cờ bị bật do trước đó thì tắt đi)
+  if (roleCode === "ADMIN") {
+    if (user.must_change_password) {
+      user.must_change_password = false;
+      await user.save();
+    }
+  } else if (password === "123456" && !user.must_change_password) {
+    // Chỉ kích hoạt đổi mật khẩu cho LECTURER và HEAD
     user.must_change_password = true;
     await user.save();
   }
 
-  const accessToken = signToken({ id: user._id, role: roleCodeOf(user) });
+  const accessToken = signToken({ id: user._id, role: roleCode });
   return successResponse(
     res,
     { access_token: accessToken, user: await publicUser(user) },
@@ -59,10 +78,16 @@ export const login = asyncHandler(async (req, res) => {
   );
 });
 
+/**
+ * API Lấy thông tin người dùng đang đăng nhập (Me)
+ */
 export const me = asyncHandler(async (req, res) => {
   return successResponse(res, await publicUser(req.user), "Thao tác thành công");
 });
 
+/**
+ * API Đổi mật khẩu lần đầu hoặc chủ động đổi mật khẩu
+ */
 export const changePassword = asyncHandler(async (req, res) => {
   const { old_password, new_password } = req.body;
   if (!new_password || new_password.length < 6) {
