@@ -11,6 +11,8 @@ export function EditProfileModal({ user, onClose, onUserChange }) {
     email: user?.email || "",
     phone: user?.phone || "",
     degree: user?.degree || "",
+    preferences: user?.preferences || "",
+    taught_hours: user?.taught_hours || 0,
   });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -21,6 +23,8 @@ export function EditProfileModal({ user, onClose, onUserChange }) {
       email: user?.email || "",
       phone: user?.phone || "",
       degree: user?.degree || "",
+      preferences: user?.preferences || "",
+      taught_hours: user?.taught_hours || 0,
     });
   }, [user]);
 
@@ -46,7 +50,7 @@ export function EditProfileModal({ user, onClose, onUserChange }) {
   };
 
   return (
-    <Modal title="Chỉnh sửa thông tin cá nhân & Liên hệ" onClose={onClose}>
+    <Modal title="Chỉnh sửa thông tin cá nhân" onClose={onClose}>
       <form className="form-grid" onSubmit={submit}>
         <Input
           label="Họ và tên"

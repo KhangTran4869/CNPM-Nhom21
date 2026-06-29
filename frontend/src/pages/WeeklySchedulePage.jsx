@@ -181,10 +181,12 @@ export function WeeklySchedulePage({ user }) {
             <option key={semester._id} value={semester._id}>{semester.name}</option>
           ))}
         </Select>
-        <Select label="Loại thời khóa biểu">
-          <option>Thời khóa biểu cá nhân</option>
-          <option>Thời khóa biểu bộ môn</option>
-        </Select>
+        {user?.role !== "LECTURER" && (
+          <Select label="Loại thời khóa biểu">
+            <option>Thời khóa biểu cá nhân</option>
+            <option>Thời khóa biểu toàn khoa</option>
+          </Select>
+        )}
         <Select label="Tuần" value={weekNumber} onChange={(e) => setWeekNumber(e.target.value)} disabled={!weeks.length}>
           {!weeks.length && <option>{semesterId ? "Chưa có ngày học kỳ" : "Chọn học kỳ để xem tuần"}</option>}
           {weeks.map((week) => {
@@ -227,6 +229,7 @@ export function WeeklySchedulePage({ user }) {
                       {cell && (
                         <div className="schedule-class-block">
                           <strong>{courseTitle(course)}</strong>
+                          <span>Lớp: <strong>{cls.code || "N/A"}</strong></span>
                           <span>Loại: {sessionTypeLabel(cell.schedule)}</span>
                           <span>Nhóm: {cell.schedule.group_code || groupOfClass(cls.code)}</span>
                           <span>Phòng: {cell.schedule.room_id?.name || "N/A"}</span>

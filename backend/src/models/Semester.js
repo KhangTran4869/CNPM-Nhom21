@@ -15,6 +15,11 @@ const semesterSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    status: {
+      type: String,
+      enum: ["PLANNING", "UPCOMING", "ACTIVE", "COMPLETED", "LOCKED"],
+      default: "PLANNING",
+    },
     is_deleted: {
       type: Boolean,
       default: false,

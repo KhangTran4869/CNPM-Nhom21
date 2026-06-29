@@ -57,6 +57,19 @@ const lecturerSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Bổ sung: Số giờ đã dạy thực tế của giảng viên (do giảng viên cập nhật hoặc hệ thống tính toán)
+    taught_hours: {
+      type: Number,
+      default: 0,
+    },
+
+    // Bổ sung: Khai báo nguyện vọng giảng dạy của giảng viên (môn yêu thích, buổi muốn dạy...)
+    preferences: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+
     status: {
       type: String,
       enum: ["ACTIVE", "BUSY", "INACTIVE"],

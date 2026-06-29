@@ -17,13 +17,13 @@ export const getClassSchedules = (classId) =>
 
 export const calculateClassHours = (schedules = []) =>
   schedules.reduce(
-    (total, item) => total + (Number(item.end_period) - Number(item.start_period) + 1),
+    (total, item) => total + (Number(item.end_period) - Number(item.start_period) + 1) * 15,
     0,
   );
 
-export const getApprovedAssignments = (extraFilter = {}) =>
+export const getApprovedAssignments = (extraFilter = {}, onlyApproved = false) =>
   Assignment.find({
-    status: "APPROVED",
+    status: onlyApproved ? "APPROVED" : { $in: ["APPROVED", "PENDING", "PROPOSED"] },
     is_deleted: false,
     ...extraFilter,
   })
@@ -33,8 +33,8 @@ export const getApprovedAssignments = (extraFilter = {}) =>
     })
     .populate({ path: "lecturer_id", populate: "department_id" });
 
-export const getCurrentHours = async (lecturerId, semesterId, excludeAssignmentId) => {
-  const assignments = await getApprovedAssignments({ lecturer_id: lecturerId });
+export const getCurrentHours = async (lecturerId, semesterId, excludeAssignmentId, onlyApproved = false) => {
+  const assignments = await getApprovedAssignments({ lecturer_id: lecturerId }, onlyApproved);
   let total = 0;
 
   for (const assignment of assignments) {
@@ -51,7 +51,9 @@ export const getCurrentHours = async (lecturerId, semesterId, excludeAssignmentI
     ) {
       continue;
     }
-    total += calculateClassHours(await getClassSchedules(assignment.class_id?._id));
+    const course = assignment.class_id?.course_id;
+    const courseHours = course?.credits ? Number(course.credits) * 15 : calculateClassHours(await getClassSchedules(assignment.class_id?._id));
+    total += courseHours;
   }
 
   return total;
@@ -103,7 +105,6 @@ export const checkLecturerBusy = async (lecturerId, classSchedules) => {
     is_deleted: false,
   });
   const busyItems = availabilityItems.filter((item) => item.status === "BUSY");
-  const freeItems = availabilityItems.filter((item) => item.status === "FREE");
   const conflicts = [];
 
   for (const incoming of classSchedules) {
@@ -124,22 +125,6 @@ export const checkLecturerBusy = async (lecturerId, classSchedules) => {
         });
       }
     }
-
-    if (
-      freeItems.length &&
-      !freeItems.some(
-        (free) =>
-          Number(incoming.day_of_week) === Number(free.day_of_week) &&
-          Number(free.start_period) <= Number(incoming.start_period) &&
-          Number(free.end_period) >= Number(incoming.end_period),
-      )
-    ) {
-      conflicts.push({
-        rule: "LECTURER_NOT_AVAILABLE",
-        message: "Giảng viên không khai báo rảnh trong khung giờ của lớp",
-        meta: { schedule_id: incoming._id },
-      });
-    }
   }
 
   return conflicts;
@@ -159,7 +144,8 @@ export const checkMaxHours = async (
     classDoc.semester_id,
     excludeAssignmentId,
   );
-  const newClassHours = calculateClassHours(classSchedules);
+  const course = classDoc.course_id;
+  const newClassHours = course?.credits ? Number(course.credits) * 15 : calculateClassHours(classSchedules);
 
   if (currentHours + newClassHours > maxHours) {
     return [
@@ -253,7 +239,7 @@ export const checkAssignmentEligibility = async ({
   }
   const existingApproved = await Assignment.findOne({
     class_id: classDoc._id,
-    status: "APPROVED",
+    status: { $in: ["APPROVED", "PENDING", "PROPOSED"] },
     is_deleted: false,
     ...(excludeAssignmentId ? { _id: { $ne: excludeAssignmentId } } : {}),
   });
@@ -269,9 +255,7 @@ export const checkAssignmentEligibility = async ({
   }
 
   const classSchedules = await getClassSchedules(classDoc._id);
-  if (!classSchedules.length) {
-    violations.push({ rule: "SCHEDULE_REQUIRED", message: "Lớp tín chỉ chưa có lịch học" });
-  }
+  // Không bắt buộc phải có lịch học ngay mới được gán/đề xuất giảng viên (hệ thống tự tính giờ theo tín chỉ môn học)
 
   violations.push(
     ...(await checkLecturerScheduleConflict(lecturer._id, classSchedules, excludeAssignmentId)),
@@ -295,7 +279,7 @@ export const getSuggestedLecturers = async (classId) => {
   if (!classDoc) return null;
   const existingAssignment = await Assignment.findOne({
     class_id: classDoc._id,
-    status: "APPROVED",
+    status: { $in: ["APPROVED", "PENDING", "PROPOSED"] },
     is_deleted: false,
   });
 
@@ -316,20 +300,29 @@ export const getSuggestedLecturers = async (classId) => {
     });
     const currentHours = await getCurrentHours(lecturer._id, classDoc.semester_id);
     if (!eligibility.is_valid) continue;
+
+    const totalHours = currentHours + (lecturer.taught_hours || 0);
+    const reasons = ["Đúng bộ môn", "Không trùng lịch", "Không vượt định mức giờ dạy"];
+    if (lecturer.preferences) {
+      reasons.push(`Nguyện vọng: ${lecturer.preferences}`);
+    }
+
     suggestions.push({
       lecturer_id: lecturer._id,
       code: lecturer.code,
       name: lecturer.name,
       degree: lecturer.degree,
       department: lecturer.department_id?.name || null,
-      current_hours: currentHours,
+      current_hours: totalHours,
       max_hours: lecturer.max_hours,
-      available_hours: Number(lecturer.max_hours || 0) - currentHours,
+      available_hours: Number(lecturer.max_hours || 0) - totalHours,
+      preferences: lecturer.preferences || "Không có",
       is_valid: true,
-      reasons: ["Đúng bộ môn", "Không trùng lịch", "Không vượt định mức giờ dạy"],
+      reasons,
       violations: eligibility.violations,
     });
   }
 
+  // Thuật toán tối ưu: Cân bằng khối lượng giảng dạy bằng cách ưu tiên giảng viên có số giờ dạy ít nhất lên đầu
   return suggestions.sort((a, b) => a.current_hours - b.current_hours);
 };

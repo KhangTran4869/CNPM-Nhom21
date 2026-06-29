@@ -24,14 +24,14 @@ export function AdminHome({ user }) {
       </Card>
 
       <Card title="Hướng dẫn nghiệp vụ cho Quản trị viên">
-        <div style={{ padding: "8px 0", lineHeight: "1.6" }}>
-          <p>⚡ Bạn đang truy cập với tư cách **Quản trị viên hệ thống (ADMIN)**.</p>
-          <ul style={{ paddingLeft: "20px", marginTop: "10px" }}>
-            <li>
+        <div style={{ padding: "8px 0", lineHeight: "1.7", color: "#334155" }}>
+          <p style={{ margin: "0 0 10px 0" }}>Bạn đang truy cập với tư cách <strong>Quản trị viên hệ thống (ADMIN)</strong>.</p>
+          <ul style={{ paddingLeft: "20px", margin: 0 }}>
+            <li style={{ marginBottom: "8px" }}>
               Sử dụng menu bên trái để khởi tạo và quản lý danh mục cốt lõi:{" "}
               <strong>Môn học, Học kỳ, Phòng học, Tài khoản, Bộ môn</strong>.
             </li>
-            <li>Hỗ trợ Trưởng bộ môn khởi tạo dữ liệu lớp tín chỉ đầu mỗi học kỳ.</li>
+            <li style={{ marginBottom: "8px" }}>Hỗ trợ Trưởng bộ môn khởi tạo dữ liệu lớp tín chỉ đầu mỗi học kỳ.</li>
             <li>Giám sát toàn bộ tiến độ phân công giảng dạy toàn trường.</li>
           </ul>
         </div>

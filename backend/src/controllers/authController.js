@@ -14,9 +14,31 @@ const publicUser = async (user) => {
     await user.populate("role_id");
   }
 
-  const lecturer = await Lecturer.findOne({ user_id: user._id, is_deleted: false })
+  let lecturer = await Lecturer.findOne({ user_id: user._id, is_deleted: false })
     .populate("department_id")
     .lean();
+
+  if (!lecturer && roleCodeOf(user) === "LECTURER") {
+    lecturer = await Lecturer.findOne({
+      $or: [{ code: user.username?.toUpperCase() }, { email: user.email }],
+      is_deleted: false,
+    })
+      .populate("department_id")
+      .lean();
+
+    if (!lecturer) {
+      const newLec = await Lecturer.create({
+        user_id: user._id,
+        code: user.username?.toUpperCase(),
+        name: user.username,
+        email: user.email || "",
+        phone: "",
+        degree: "",
+        taught_hours: 0,
+      });
+      lecturer = newLec.toObject();
+    }
+  }
 
   const roleCode = roleCodeOf(user);
 
@@ -37,6 +59,8 @@ const publicUser = async (user) => {
     department: lecturer?.department_id?.name || null,
     department_id: lecturer?.department_id?._id || null,
     max_hours: lecturer?.max_hours || null,
+    taught_hours: lecturer?.taught_hours || 0,
+    preferences: lecturer?.preferences || null,
     lecturer_status: lecturer?.status || null,
   };
 };
@@ -117,11 +141,11 @@ export const changePassword = asyncHandler(async (req, res) => {
 });
 
 /**
- * API Cập nhật thông tin cá nhân (Họ tên, email, sđt, học vị)
+ * API Cập nhật thông tin cá nhân (Họ tên, email, sđt, học vị, nguyện vọng, số giờ đã dạy)
  * Nếu tài khoản chưa được liên kết với hồ sơ Lecturer trong CSDL, tự động tạo hồ sơ mới và liên kết.
  */
 export const updateProfile = asyncHandler(async (req, res) => {
-  const { name, email, phone, degree } = req.body;
+  const { name, email, phone, degree, preferences, taught_hours } = req.body;
 
   let lecturer = await Lecturer.findOne({ user_id: req.user._id, is_deleted: false });
   if (!lecturer) {
@@ -132,6 +156,8 @@ export const updateProfile = asyncHandler(async (req, res) => {
       email: email || "",
       phone: phone || "",
       degree: degree || "",
+      preferences: preferences || null,
+      taught_hours: Number(taught_hours) || 0,
       faculty: "Khoa Công nghệ thông tin",
       status: "ACTIVE",
     });
@@ -140,6 +166,8 @@ export const updateProfile = asyncHandler(async (req, res) => {
     if (email !== undefined) lecturer.email = email;
     if (phone !== undefined) lecturer.phone = phone;
     if (degree !== undefined) lecturer.degree = degree;
+    if (preferences !== undefined) lecturer.preferences = preferences;
+    if (taught_hours !== undefined) lecturer.taught_hours = Number(taught_hours) || 0;
   }
   await lecturer.save();
 

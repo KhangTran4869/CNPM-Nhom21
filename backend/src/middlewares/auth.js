@@ -24,11 +24,35 @@ export const authenticate = async (req, res, next) => {
 
     req.user = user;
     req.userRole = roleCodeOf(user);
-    req.lecturer = await Lecturer.findOne({
+    let lecturer = await Lecturer.findOne({
       user_id: user._id,
       is_deleted: false,
     });
-    // TODO: schema hiện chưa có department ownership cho HEAD; thêm field này để giới hạn dữ liệu theo khoa/bộ môn.
+
+    if (!lecturer && req.userRole === "LECTURER") {
+      lecturer = await Lecturer.findOne({
+        $or: [
+          { code: user.username.toUpperCase() },
+          { email: user.email },
+        ],
+        is_deleted: false,
+      });
+      if (lecturer && !lecturer.user_id) {
+        lecturer.user_id = user._id;
+        await lecturer.save();
+      } else if (!lecturer) {
+        lecturer = await Lecturer.create({
+          user_id: user._id,
+          code: user.username.toUpperCase(),
+          name: user.username,
+          email: user.email || "",
+          phone: "",
+          degree: "",
+          taught_hours: 0,
+        });
+      }
+    }
+    req.lecturer = lecturer;
     next();
   } catch (error) {
     return errorResponse(res, "Chưa đăng nhập", [error.message], 401);

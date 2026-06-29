@@ -26,19 +26,19 @@ export function HeadHome({ user, onUserChange }) {
           <InfoCell label="Số điện thoại" value={user?.phone} />
           <InfoCell label="Email liên hệ" value={user?.email} />
         </div>
-        <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px dashed #e5e7eb" }}>
+        <div style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid #e2e8f0" }}>
           <Button onClick={() => setEditModal(true)} style={{ width: "100%" }}>
-            ✏️ Chỉnh sửa thông tin cá nhân & Liên hệ
+            Chỉnh sửa thông tin cá nhân & Liên hệ
           </Button>
         </div>
       </Card>
 
       <Card title="Quyền hạn & Nhiệm vụ Trưởng khoa">
-        <div style={{ padding: "8px 0", lineHeight: "1.6" }}>
-          <p>👑 <strong>Quyền hạn quản lý Trưởng khoa:</strong></p>
-          <ul style={{ paddingLeft: "20px", marginTop: "10px" }}>
-            <li>Quản lý toàn bộ các bộ môn, danh sách giảng viên trực thuộc và lớp tín chỉ trong Khoa.</li>
-            <li>Thực hiện và phê duyệt <strong>Phân công giảng viên</strong> vào các lớp tín chỉ thuộc Khoa phụ trách.</li>
+        <div style={{ padding: "8px 0", lineHeight: "1.7", color: "#334155" }}>
+          <p style={{ margin: "0 0 10px 0" }}><strong>Quyền hạn quản lý Trưởng khoa:</strong></p>
+          <ul style={{ paddingLeft: "20px", margin: 0 }}>
+            <li style={{ marginBottom: "8px" }}>Quản lý toàn bộ các bộ môn, danh sách giảng viên trực thuộc và lớp tín chỉ trong Khoa.</li>
+            <li style={{ marginBottom: "8px" }}>Thực hiện và phê duyệt <strong>Phân công giảng viên</strong> vào các lớp tín chỉ thuộc Khoa phụ trách.</li>
             <li>Tự động rà soát xung đột lịch giảng dạy, theo dõi khối lượng giảng dạy và báo cáo thống kê toàn Khoa.</li>
           </ul>
         </div>

@@ -27,7 +27,7 @@ const duplicated = async (lecturerId, body, excludeId) => {
 };
 
 export const getAllLecturerAvailabilities = asyncHandler(async (req, res) => {
-  const lecturerId = req.params.lecturer_id || req.query.lecturer_id;
+  const lecturerId = req.userRole === "LECTURER" ? (req.lecturer?._id || req.params.lecturer_id || req.query.lecturer_id) : (req.params.lecturer_id || req.query.lecturer_id);
   if (lecturerId && !canAccessLecturer(req, lecturerId)) {
     return errorResponse(res, "Không có quyền", ["FORBIDDEN"], 403);
   }
@@ -38,7 +38,7 @@ export const getAllLecturerAvailabilities = asyncHandler(async (req, res) => {
 });
 
 export const createLecturerAvailability = asyncHandler(async (req, res) => {
-  const lecturerId = req.params.lecturer_id || req.body.lecturer_id;
+  const lecturerId = req.userRole === "LECTURER" ? (req.lecturer?._id || req.params.lecturer_id || req.body.lecturer_id) : (req.params.lecturer_id || req.body.lecturer_id);
   if (!canAccessLecturer(req, lecturerId)) return errorResponse(res, "Không có quyền", ["FORBIDDEN"], 403);
   const lecturer = await Lecturer.exists({ _id: lecturerId, is_deleted: false });
   if (!lecturer) return errorResponse(res, "Giảng viên không tồn tại", ["LECTURER_NOT_FOUND"], 404);

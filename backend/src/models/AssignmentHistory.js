@@ -17,6 +17,19 @@ const assignmentHistorySchema = new mongoose.Schema(
       ref: "Lecturer",
       default: null,
     },
+    changed_by: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    changed_by_name: {
+      type: String,
+      default: "",
+    },
+    reason: {
+      type: String,
+      default: "",
+    },
     changed_at: {
       type: Date,
       default: Date.now,

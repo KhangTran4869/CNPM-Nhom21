@@ -3,7 +3,8 @@ import { asyncHandler, errorResponse, successResponse } from "../utils/apiRespon
 
 export const getAllAssignmentsHistory = asyncHandler(async (req, res) => {
   const filter = { is_deleted: false };
-  if (req.params.assignment_id) filter.assignment_id = req.params.assignment_id;
+  const assignmentId = req.params.assignment_id || req.query.assignment_id;
+  if (assignmentId) filter.assignment_id = assignmentId;
   const history = await AssignmentHistory.find(filter)
     .populate({
       path: "assignment_id",
@@ -12,7 +13,7 @@ export const getAllAssignmentsHistory = asyncHandler(async (req, res) => {
         populate: [{ path: "course_id" }, { path: "semester_id" }],
       },
     })
-    .populate("old_lecturer_id new_lecturer_id")
+    .populate("old_lecturer_id new_lecturer_id changed_by")
     .sort({ changed_at: "desc" });
   return successResponse(res, history);
 });

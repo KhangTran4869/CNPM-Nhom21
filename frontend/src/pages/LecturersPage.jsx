@@ -57,7 +57,18 @@ export function LecturersPage({ user }) {
     setLoading(true);
     lecturerService
       .getLecturers(filters)
-      .then(setLecturers)
+      .then((data) => {
+        const list = (data || []).filter((item) => {
+          const codeUpper = (item.code || "").toUpperCase();
+          const nameUpper = (item.name || "").toUpperCase();
+          const roleCode = item.user_id?.role_id?.code || item.user_id?.role;
+          if (roleCode === "HEAD" || roleCode === "ADMIN") return false;
+          if (codeUpper.includes("TRUONGKHOA") || codeUpper.includes("ADMIN")) return false;
+          if (nameUpper.includes("TRƯỞNG KHOA") || nameUpper === "ADMIN") return false;
+          return true;
+        });
+        setLecturers(list);
+      })
       .catch(() => setLecturers([]))
       .finally(() => setLoading(false));
   };

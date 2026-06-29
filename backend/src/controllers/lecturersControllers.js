@@ -77,12 +77,23 @@ export const getAllLecturers = asyncHandler(async (req, res) => {
   }
   const page = Number(req.query.page || 1);
   const limit = Number(req.query.limit || 50);
-  const lecturers = await Lecturer.find(filter)
-    .populate("department_id user_id")
-    .sort({ createdAt: "desc" })
-    .skip((page - 1) * limit)
-    .limit(limit);
-  return successResponse(res, lecturers);
+  const allLecturers = await Lecturer.find(filter)
+    .populate({ path: "user_id", populate: { path: "role_id" } })
+    .populate("department_id")
+    .sort({ createdAt: "desc" });
+
+  const validLecturers = allLecturers.filter((item) => {
+    const roleCode = item.user_id?.role_id?.code || item.user_id?.role;
+    if (roleCode === "HEAD" || roleCode === "ADMIN") return false;
+    const codeStr = (item.code || "").toUpperCase();
+    const nameStr = (item.name || "").toUpperCase();
+    if (codeStr.includes("TRUONGKHOA") || codeStr.includes("ADMIN")) return false;
+    if (nameStr.includes("TRƯỞNG KHOA") || nameStr === "ADMIN") return false;
+    return true;
+  });
+
+  const paginated = validLecturers.slice((page - 1) * limit, page * limit);
+  return successResponse(res, paginated);
 });
 
 /**
@@ -99,6 +110,8 @@ export const createLecturer = asyncHandler(async (req, res) => {
     department_id,
     user_id,
     max_hours,
+    preferences,
+    taught_hours = 0,
     status = "ACTIVE",
   } = req.body;
 
@@ -141,6 +154,8 @@ export const createLecturer = asyncHandler(async (req, res) => {
     department_id,
     user_id: account.user._id,
     max_hours,
+    preferences,
+    taught_hours: Number(taught_hours) || 0,
     status: normalizeCode(status),
   });
   const populated = await lecturer.populate("department_id user_id");
@@ -155,7 +170,7 @@ export const updateLecturer = asyncHandler(async (req, res) => {
     return errorResponse(res, "Không có quyền", ["FORBIDDEN"], 403);
   }
 
-  const allowed = ["name", "email", "phone", "degree", "faculty"];
+  const allowed = ["name", "email", "phone", "degree", "faculty", "preferences", "taught_hours"];
   if (req.userRole === "ADMIN") {
     allowed.push("department_id", "user_id", "max_hours", "status");
   }

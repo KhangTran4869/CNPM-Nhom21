@@ -4,7 +4,7 @@ import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Field";
 
 export function LoginPage({ onLogin }) {
-  const [form, setForm] = useState({ username: "admin", password: "123456" });
+  const [form, setForm] = useState({ username: "", password: "12345678" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 

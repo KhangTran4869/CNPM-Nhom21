@@ -7,14 +7,18 @@ const toneByStatus = {
   ASSIGNED: "success",
   BUSY: "warning",
   FREE: "info",
-  OVERLOAD: "danger",
+  OVERLOAD: "warning",
   NORMAL: "success",
+  UNDERLOAD: "danger",
+  "Thiếu giờ": "danger",
+  "Đủ tải": "success",
+  "Vượt tải": "warning",
   ADMIN: "danger",
   HEAD: "warning",
   LECTURER: "info",
 };
 
-export function Badge({ children }) {
-  const tone = toneByStatus[children] || "info";
+export function Badge({ children, variant }) {
+  const tone = variant || toneByStatus[children] || "info";
   return <span className={`status-badge ${tone}`}>{children || "N/A"}</span>;
 }

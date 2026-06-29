@@ -6,10 +6,8 @@ const menu = {
   LECTURER: [
     { path: "/teaching-schedule/weekly", label: "Xem lịch dạy dạng tuần" },
     { path: "/teaching-schedule/semester", label: "Xem lịch dạy dạng học kỳ" },
-    { path: "/availability", label: "Khai báo lịch bận / lịch rảnh" },
+    { path: "/availability", label: "Khai báo lịch bận" },
     { path: "/reports", label: "Khối lượng giảng dạy" },
-    { path: "/classes", label: "Danh sách lớp tín chỉ" },
-    { path: "/assignments", label: "Phân công của tôi" },
   ],
   HEAD: [
     { path: "/lecturers", label: "Danh sách giảng viên" },
@@ -27,7 +25,6 @@ const menu = {
     { path: "/rooms", label: "Quản lý phòng học" },
     { path: "/assignments", label: "Phân công & Duyệt giảng dạy" },
     { path: "/reports", label: "Báo cáo thống kê" },
-    { path: "/assignment-history", label: "Lịch sử thay đổi phân công" },
   ],
 };
 

@@ -19,6 +19,14 @@ const validateSchedule = ({ day_of_week, start_period, end_period, session_type 
   return errors;
 };
 
+const hasApprovedAssignment = async (classId) => {
+  const classDoc = await Class.findOne({ _id: classId, is_deleted: false });
+  if (classDoc && ["CANCELLED", "ACTIVE", "COMPLETED", "ASSIGNED"].includes(classDoc.status)) {
+    return true;
+  }
+  return await Assignment.exists({ class_id: classId, status: "APPROVED", is_deleted: false });
+};
+
 const schedulePayload = (body, classId) => ({
   class_id: classId,
   day_of_week: body.day_of_week,
@@ -28,9 +36,6 @@ const schedulePayload = (body, classId) => ({
   session_type: normalizeSessionType(body.session_type),
   group_code: body.group_code?.trim() || null,
 });
-
-const classLocked = (classId) =>
-  Assignment.exists({ class_id: classId, status: "APPROVED", is_deleted: false });
 
 export const getAllSchedules = asyncHandler(async (req, res) => {
   const filter = { is_deleted: false };
@@ -48,15 +53,18 @@ export const createSchedule = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(room_id)) errors.push("ROOM_ID_INVALID");
   if (errors.length) return errorResponse(res, "Dữ liệu không hợp lệ", errors, 400);
 
+  if (await hasApprovedAssignment(classId)) {
+    return errorResponse(res, "Lớp học đã được duyệt phân công giảng viên. Vui lòng thu hồi phân công trước khi thêm lịch.", ["ASSIGNMENT_LOCKED"], 403);
+  }
+
   const classDoc = await Class.findOne({ _id: classId, is_deleted: false });
   const room = await Room.findOne({ _id: room_id, is_deleted: false });
   if (!classDoc) errors.push("CLASS_NOT_FOUND");
   if (!room) errors.push("ROOM_NOT_FOUND");
   if (classDoc && room && Number(classDoc.max_students || 0) > Number(room.capacity || 0)) {
-    errors.push({ rule: "ROOM_CAPACITY_INVALID", message: "Phòng học không đủ sức chứa" });
+    errors.push({ rule: "ROOM_CAPACITY_INVALID", message: `Phòng học ${room.name} (chứa ${room.capacity}) không đủ cho ${classDoc.max_students} SV` });
   }
-  if (await classLocked(classId)) errors.push("ASSIGNMENT_LOCKED");
-  if (errors.length) return errorResponse(res, "Dữ liệu không hợp lệ", errors, errors.includes("ASSIGNMENT_LOCKED") ? 409 : 400);
+  if (errors.length) return errorResponse(res, "Dữ liệu không hợp lệ", errors, 400);
 
   const schedule = await Schedule.create(
     schedulePayload({ ...req.body, day_of_week, start_period, end_period, room_id }, classId),
@@ -67,11 +75,20 @@ export const createSchedule = asyncHandler(async (req, res) => {
 export const updateSchedule = asyncHandler(async (req, res) => {
   const existing = await Schedule.findOne({ _id: req.params.id, is_deleted: false });
   if (!existing) return errorResponse(res, "Lịch dạy không tồn tại", ["SCHEDULE_NOT_FOUND"], 404);
-  if (await classLocked(existing.class_id)) {
-    return errorResponse(res, "Không thể sửa lịch lớp đã có phân công được duyệt", ["ASSIGNMENT_LOCKED"], 409);
+
+  if (await hasApprovedAssignment(existing.class_id)) {
+    return errorResponse(res, "Lớp học đã được duyệt phân công giảng viên. Vui lòng thu hồi phân công trước khi sửa lịch.", ["ASSIGNMENT_LOCKED"], 403);
   }
+
   const errors = validateSchedule({ ...existing.toObject(), ...req.body });
   if (errors.length) return errorResponse(res, "Dữ liệu không hợp lệ", errors, 400);
+
+  const roomId = req.body.room_id || existing.room_id;
+  const classDoc = await Class.findOne({ _id: existing.class_id, is_deleted: false });
+  const room = await Room.findOne({ _id: roomId, is_deleted: false });
+  if (classDoc && room && Number(classDoc.max_students || 0) > Number(room.capacity || 0)) {
+    return errorResponse(res, `Phòng học ${room.name} (chứa ${room.capacity}) không đủ cho ${classDoc.max_students} SV`, ["ROOM_CAPACITY_INVALID"], 400);
+  }
 
   const nextPayload = schedulePayload({ ...existing.toObject(), ...req.body }, existing.class_id);
   const schedule = await Schedule.findByIdAndUpdate(req.params.id, nextPayload, { new: true });
@@ -81,9 +98,11 @@ export const updateSchedule = asyncHandler(async (req, res) => {
 export const deleteSchedule = asyncHandler(async (req, res) => {
   const schedule = await Schedule.findOne({ _id: req.params.id, is_deleted: false });
   if (!schedule) return errorResponse(res, "Lịch dạy không tồn tại", ["SCHEDULE_NOT_FOUND"], 404);
-  if (await classLocked(schedule.class_id)) {
-    return errorResponse(res, "Không thể xóa lịch lớp đã có phân công được duyệt", ["ASSIGNMENT_LOCKED"], 409);
+
+  if (await hasApprovedAssignment(schedule.class_id)) {
+    return errorResponse(res, "Lớp học đã được duyệt phân công giảng viên. Vui lòng thu hồi phân công trước khi xóa lịch.", ["ASSIGNMENT_LOCKED"], 403);
   }
+
   schedule.is_deleted = true;
   await schedule.save();
   return successResponse(res, schedule, "Lịch dạy đã được xóa");

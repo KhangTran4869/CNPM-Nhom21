@@ -11,12 +11,28 @@ const sessionsPerCredit = 4;
 
 const scheduleTypes = [
   { value: "personal", label: "Thời khóa biểu cá nhân" },
-  { value: "all", label: "Thời khóa biểu toàn bộ" },
+  { value: "all", label: "Thời khóa biểu toàn khoa" },
 ];
 
 const groupOfClass = (classCode) => {
   const match = String(classCode || "").match(/(\d+)$/);
   return match ? match[1] : "N/A";
+};
+
+const formatScheduleTime = (schedule) => {
+  if (!schedule) return "N/A";
+  const day = schedule.day_of_week;
+  let dayStr = "";
+  if (day === 8 || String(day).toUpperCase() === "CN" || String(day).toLowerCase() === "chủ nhật") {
+    dayStr = "CN";
+  } else if (!isNaN(day)) {
+    dayStr = `T${day}`;
+  } else {
+    dayStr = String(day).replace(/Thứ\s*/i, "T");
+  }
+  const start = Number(schedule.start_period || 1);
+  const end = schedule.end_period !== undefined && schedule.end_period !== null ? Number(schedule.end_period) : start;
+  return `${dayStr}, tiết ${start}-${end}`;
 };
 
 const dateOnly = (value) => {
@@ -162,9 +178,7 @@ export function SemesterSchedulePage({ user }) {
       "Nhóm tổ",
       "Số tín chỉ",
       "Lớp",
-      "Thứ",
-      "Tiết bắt đầu",
-      "Số tiết",
+      "Lịch học",
       "Phòng",
       "Giảng viên",
       "Thời gian",
@@ -179,9 +193,7 @@ export function SemesterSchedulePage({ user }) {
           groupOfClass(cls.code),
           course.credits || "",
           cls.code || "",
-          schedule?.day_of_week || "",
-          schedule?.start_period || "",
-          schedule ? Number(schedule.end_period) - Number(schedule.start_period) + 1 : "",
+          formatScheduleTime(schedule),
           schedule?.room_id?.name || "",
           lecturer.name || "",
           schedule ? getScheduleDateRange(semester, cls, schedule) : "",
@@ -218,11 +230,13 @@ export function SemesterSchedulePage({ user }) {
             <option key={semester._id} value={semester._id}>{semester.name}</option>
           ))}
         </Select>
-        <Select label="Loại thời khóa biểu" value={scheduleType} onChange={(event) => setScheduleType(event.target.value)}>
-          {scheduleTypes.map((type) => (
-            <option key={type.value} value={type.value}>{type.label}</option>
-          ))}
-        </Select>
+        {user?.role !== "LECTURER" && (
+          <Select label="Loại thời khóa biểu" value={scheduleType} onChange={(event) => setScheduleType(event.target.value)}>
+            {scheduleTypes.map((type) => (
+              <option key={type.value} value={type.value}>{type.label}</option>
+            ))}
+          </Select>
+        )}
       </div>
 
       {loading && <div className="alert">Đang tải thời khóa biểu học kỳ...</div>}
@@ -237,9 +251,7 @@ export function SemesterSchedulePage({ user }) {
               <th>Nhóm tổ</th>
               <th>Số tín chỉ</th>
               <th>Lớp</th>
-              <th>Thứ</th>
-              <th>Tiết bắt đầu</th>
-              <th>Số tiết</th>
+              <th>Lịch học</th>
               <th>Phòng</th>
               <th>Giảng viên</th>
               <th>Thời gian</th>
@@ -248,7 +260,7 @@ export function SemesterSchedulePage({ user }) {
           <tbody>
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan="11">Không có dữ liệu thời khóa biểu</td>
+                <td colSpan="9">Không có dữ liệu thời khóa biểu</td>
               </tr>
             )}
             {!loading &&
@@ -264,9 +276,7 @@ export function SemesterSchedulePage({ user }) {
                         <td rowSpan={schedules.length} className="semester-class-cell">{cls.code || "N/A"}</td>
                       </>
                     )}
-                    <td>{schedule?.day_of_week || "N/A"}</td>
-                    <td>{schedule?.start_period || "N/A"}</td>
-                    <td>{schedule ? Number(schedule.end_period) - Number(schedule.start_period) + 1 : "N/A"}</td>
+                    <td>{formatScheduleTime(schedule)}</td>
                     <td>{schedule?.room_id?.name || "N/A"}</td>
                     <td>{lecturer.name || "N/A"}</td>
                     <td>{schedule ? getScheduleDateRange(semester, cls, schedule) : "N/A"}</td>

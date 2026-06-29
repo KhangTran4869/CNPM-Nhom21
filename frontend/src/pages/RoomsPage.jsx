@@ -43,6 +43,10 @@ export function RoomsPage() {
   const submit = async (event) => {
     event.preventDefault();
     setError("");
+    if (isNaN(form.capacity) || Number(form.capacity) <= 0) {
+      setError("Sức chứa phòng học phải là số dương lớn hơn 0");
+      return;
+    }
     try {
       if (selectedRoom) {
         await api.put(`/rooms/${selectedRoom._id}`, form);
@@ -54,24 +58,20 @@ export function RoomsPage() {
       setForm(emptyForm);
       load();
     } catch (err) {
-      setError(errorText(err, "Không thể lưu phòng học"));
+      setError(err.payload?.errors?.map((item) => item.message || item).join(", ") || err.message);
     }
   };
 
   const remove = async (room) => {
-    if (!window.confirm(`Xóa phòng học ${room.name}?`)) return;
-    setError("");
-    try {
+    if (window.confirm(`Xác nhận xóa phòng ${room.name}?`)) {
       await api.delete(`/rooms/${room._id}`);
       load();
-    } catch (err) {
-      setError(errorText(err));
     }
   };
 
   const columns = [
-    { key: "name", title: "Tên phòng" },
-    { key: "capacity", title: "Sức chứa" },
+    { key: "name", title: "Tên phòng", render: (row) => row.name },
+    { key: "capacity", title: "Sức chứa", render: (row) => `${row.capacity} chỗ` },
     {
       key: "actions",
       title: "Hành động",
@@ -105,7 +105,7 @@ export function RoomsPage() {
       <Modal title={modal} onClose={() => setModal("")}>
         <form className="form-grid" onSubmit={submit}>
           <Input label="Tên phòng" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
-          <Input label="Sức chứa" type="number" value={form.capacity} onChange={(event) => setForm({ ...form, capacity: Number(event.target.value) })} required />
+          <Input label="Sức chứa" type="number" min={10} value={form.capacity} onChange={(event) => setForm({ ...form, capacity: Number(event.target.value) })} required />
           {error && <div className="alert danger">{error}</div>}
           <Button className="form-submit" type="submit">Lưu</Button>
         </form>

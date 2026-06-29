@@ -30,6 +30,9 @@ export const getMyTeachingSchedule = asyncHandler(async (req, res) => {
 });
 
 export const getLecturerTeachingSchedule = asyncHandler(async (req, res) => {
+  if (req.userRole === "LECTURER" && req.lecturer && String(req.lecturer._id) !== String(req.params.lecturer_id)) {
+    return errorResponse(res, "Không có quyền", ["FORBIDDEN"], 403);
+  }
   const data = await scheduleForLecturer(req.params.lecturer_id, req.query);
   return successResponse(res, data);
 });

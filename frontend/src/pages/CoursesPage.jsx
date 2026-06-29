@@ -53,6 +53,10 @@ export function CoursesPage() {
   const submit = async (event) => {
     event.preventDefault();
     setError("");
+    if (isNaN(form.credits) || Number(form.credits) <= 0) {
+      setError("Số tín chỉ phải là số dương lớn hơn 0");
+      return;
+    }
     try {
       if (selectedCourse) {
         await api.put(`/courses/${selectedCourse._id}`, form);
@@ -64,18 +68,14 @@ export function CoursesPage() {
       setForm(emptyForm);
       load();
     } catch (err) {
-      setError(errorText(err, "Không thể lưu môn học"));
+      setError(err.payload?.errors?.map((item) => item.message || item).join(", ") || err.message || "Không thể lưu môn học");
     }
   };
 
   const remove = async (course) => {
-    if (!window.confirm(`Xóa môn học ${course.name}?`)) return;
-    setError("");
-    try {
+    if (window.confirm(`Xóa môn học ${course.name}?`)) {
       await api.delete(`/courses/${course._id}`);
       load();
-    } catch (err) {
-      setError(errorText(err));
     }
   };
 
@@ -118,7 +118,7 @@ export function CoursesPage() {
         <form className="form-grid" onSubmit={submit}>
           <Input label="Mã môn" value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })} required />
           <Input label="Tên môn" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
-          <Input label="Số tín chỉ" type="number" value={form.credits} onChange={(event) => setForm({ ...form, credits: Number(event.target.value) })} required />
+          <Input label="Số tín chỉ" type="number" min={1} value={form.credits} onChange={(event) => setForm({ ...form, credits: Number(event.target.value) })} required />
           <Select label="Bộ môn" value={form.department_id} onChange={(event) => setForm({ ...form, department_id: event.target.value })}>
             <option value="">Chọn bộ môn</option>
             {departments.map((department) => (
