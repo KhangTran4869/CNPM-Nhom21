@@ -117,6 +117,10 @@ export function ReportsPage({ user }) {
       let data = [];
       let fileName = "";
 
+      const semObj = semesters.find(s => String(s._id) === String(semesterId));
+      const semTag = semObj ? `_${semObj.name.replace(/\s+/g, "_")}` : "";
+      const facTag = user?.role === "HEAD" && user?.faculty ? `_${user.faculty.replace(/\s+/g, "_")}` : "";
+
       if (isLecturer) {
         headers = ["Mã lớp tín chỉ", "Tên môn học", "Số tín chỉ", "Khối lượng giờ", "Trạng thái"];
         data = rows.map(row => [
@@ -137,19 +141,19 @@ export function ReportsPage({ user }) {
           row.class_id?.semester_id?.name || "N/A",
           row.status || "N/A"
         ]);
-        fileName = "Danh_sach_phan_cong.xlsx";
+        fileName = `Danh_sach_phan_cong${facTag}${semTag}.xlsx`;
       } else {
         headers = ["Mã GV", "Họ tên", "Bộ môn", "Học kỳ", "Khối lượng (giờ)", "Số giờ tối đa", "Trạng thái"];
         data = rows.map(row => [
           row.code || "N/A",
           row.name || "N/A",
           row.department || "N/A",
-          row.semester_name || semesters.find(s => String(s._id) === String(semesterId))?.name || "Tất cả học kỳ",
+          row.semester_name || semObj?.name || "Tất cả học kỳ",
           row.total_hours || 0,
           row.max_hours || 180,
           row.status || "N/A"
         ]);
-        fileName = "Bao_cao_khoi_luong_giang_day.xlsx";
+        fileName = `Bao_cao_khoi_luong${facTag}${semTag}.xlsx`;
       }
 
       const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
@@ -209,7 +213,7 @@ export function ReportsPage({ user }) {
   return (
     <Card
       title={isLecturer ? "Khối lượng giảng dạy của tôi" : "Báo cáo thống kê"}
-      actions={!isLecturer && isAdmin && (
+      actions={!isLecturer && (isAdmin || user?.role === "HEAD") && (
         <div className="row-actions">
           <Button variant="primary" onClick={exportReport} style={{ background: "#10b981", borderColor: "#059669", color: "white", fontWeight: 600 }}>Xuất Excel (.xlsx)</Button>
         </div>

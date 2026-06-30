@@ -110,7 +110,7 @@ export function WeeklySchedulePage({ user }) {
   useEffect(() => {
     setLoading(true);
     api
-      .get("/me/teaching-schedule", { semester_id: semesterId })
+      .get("/me/teaching-schedule", { semester_id: semesterId, status: "APPROVED" })
       .then(async (data) => {
         const enriched = await Promise.all(
           data.map(async (assignment) => {

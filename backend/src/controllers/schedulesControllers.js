@@ -3,6 +3,7 @@ import Class from "../models/Class.js";
 import Room from "../models/Room.js";
 import Schedule from "../models/Schedule.js";
 import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
+import { rangesOverlap } from "../utils/time.js";
 import mongoose from "mongoose";
 
 const SESSION_TYPES = ["THEORY", "PRACTICE"];
@@ -27,11 +28,40 @@ const hasApprovedAssignment = async (classId) => {
   return await Assignment.exists({ class_id: classId, status: "APPROVED", is_deleted: false });
 };
 
+const checkRoomScheduleConflict = async (classId, roomId, dayOfWeek, startPeriod, endPeriod, excludeScheduleId = null) => {
+  const targetClass = await Class.findOne({ _id: classId, is_deleted: false });
+  if (!targetClass || !targetClass.semester_id) return null;
+
+  const semesterClasses = await Class.find({ semester_id: targetClass.semester_id, is_deleted: false }).select("_id code");
+  const classIds = semesterClasses.map((c) => c._id);
+  const classCodeMap = new Map(semesterClasses.map((c) => [String(c._id), c.code]));
+
+  const query = {
+    class_id: { $in: classIds },
+    room_id: roomId,
+    day_of_week: Number(dayOfWeek),
+    is_deleted: false,
+  };
+  if (excludeScheduleId) {
+    query._id = { $ne: excludeScheduleId };
+  }
+
+  const existingSchedules = await Schedule.find(query).populate("room_id");
+  for (const s of existingSchedules) {
+    if (rangesOverlap(startPeriod, endPeriod, s.start_period, s.end_period)) {
+      const conflictClassCode = classCodeMap.get(String(s.class_id)) || "khác";
+      const roomName = s.room_id?.name || "phòng này";
+      return `Phòng học ${roomName} đang bị trùng lịch! Đã có lớp "${conflictClassCode}" học vào Thứ ${dayOfWeek}, tiết ${s.start_period}-${s.end_period}.`;
+    }
+  }
+  return null;
+};
+
 const schedulePayload = (body, classId) => ({
   class_id: classId,
-  day_of_week: body.day_of_week,
-  start_period: body.start_period,
-  end_period: body.end_period,
+  day_of_week: Number(body.day_of_week),
+  start_period: Number(body.start_period),
+  end_period: Number(body.end_period),
   room_id: body.room_id,
   session_type: normalizeSessionType(body.session_type),
   group_code: body.group_code?.trim() || null,
@@ -66,6 +96,11 @@ export const createSchedule = asyncHandler(async (req, res) => {
   }
   if (errors.length) return errorResponse(res, "Dữ liệu không hợp lệ", errors, 400);
 
+  const conflictMsg = await checkRoomScheduleConflict(classId, room_id, day_of_week, start_period, end_period);
+  if (conflictMsg) {
+    return errorResponse(res, conflictMsg, [{ rule: "ROOM_SCHEDULE_CONFLICT", message: conflictMsg }], 400);
+  }
+
   const schedule = await Schedule.create(
     schedulePayload({ ...req.body, day_of_week, start_period, end_period, room_id }, classId),
   );
@@ -88,6 +123,14 @@ export const updateSchedule = asyncHandler(async (req, res) => {
   const room = await Room.findOne({ _id: roomId, is_deleted: false });
   if (classDoc && room && Number(classDoc.max_students || 0) > Number(room.capacity || 0)) {
     return errorResponse(res, `Phòng học ${room.name} (chứa ${room.capacity}) không đủ cho ${classDoc.max_students} SV`, ["ROOM_CAPACITY_INVALID"], 400);
+  }
+
+  const dayOfWeek = req.body.day_of_week ?? existing.day_of_week;
+  const startPeriod = req.body.start_period ?? existing.start_period;
+  const endPeriod = req.body.end_period ?? existing.end_period;
+  const conflictMsg = await checkRoomScheduleConflict(existing.class_id, roomId, dayOfWeek, startPeriod, endPeriod, existing._id);
+  if (conflictMsg) {
+    return errorResponse(res, conflictMsg, [{ rule: "ROOM_SCHEDULE_CONFLICT", message: conflictMsg }], 400);
   }
 
   const nextPayload = schedulePayload({ ...existing.toObject(), ...req.body }, existing.class_id);

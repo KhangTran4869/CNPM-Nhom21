@@ -4,7 +4,11 @@ import { normalizeCode } from "../utils/constants.js";
 
 const scheduleForLecturer = async (lecturerId, query = {}) => {
   const filter = { lecturer_id: lecturerId, is_deleted: false };
-  if (query.status) filter.status = normalizeCode(query.status);
+  if (query.status && query.status !== "all") {
+    filter.status = normalizeCode(query.status);
+  } else if (!query.status) {
+    filter.status = "APPROVED";
+  }
   const assignments = await Assignment.find(filter)
     .populate({
       path: "class_id",

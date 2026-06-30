@@ -145,6 +145,7 @@ export function ClassesPage({ user }) {
         ROOM_CAPACITY_INVALID: err.payload?.errors?.[0]?.message || "Sức chứa của phòng học không đủ cho số lượng sinh viên tối đa của lớp.",
         ROOM_NOT_FOUND: "Phòng học không tồn tại hoặc đã bị xóa.",
         SCHEDULE_NOT_FOUND: "Lịch học không tồn tại.",
+        ROOM_SCHEDULE_CONFLICT: err.payload?.errors?.[0]?.message || err.message || "Phòng học đã có lớp khác dạy trùng vào khung giờ này.",
       };
       setError(err.payload?.errors?.map((item) => errorMap[item] || item.message || item.rule || item).join(", ") || err.message);
     }

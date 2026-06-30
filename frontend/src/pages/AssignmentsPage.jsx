@@ -387,7 +387,7 @@ export function AssignmentsPage({ user, navigate }) {
             style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", minWidth: "220px", backgroundColor: "#fff" }}
           >
             <option value="">Tất cả học kỳ</option>
-            {semesters.map((s) => <option key={s._id} value={s._id}>{s.name}{s.status === "ACTIVE" ? " ⚡" : ""}</option>)}
+            {semesters.map((s) => <option key={s._id} value={s._id}>{s.name}{s.status === "ACTIVE" ? " " : ""}</option>)}
           </select>
         </div>
         {message && <div className="alert success" style={{ marginBottom: "16px", background: "#d1fae5", color: "#065f46", padding: "12px", borderRadius: "6px" }}>{message}</div>}

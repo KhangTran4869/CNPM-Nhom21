@@ -20,8 +20,13 @@ export const getAllAssignments = asyncHandler(async (req, res) => {
   for (const key of ["lecturer_id", "class_id"]) {
     if (req.query[key]) filter[key] = req.query[key];
   }
-  if (req.query.status) filter.status = normalizeCode(req.query.status);
-  if (req.userRole === "LECTURER") filter.lecturer_id = req.lecturer?._id;
+  if (req.query.status && req.query.status !== "all") {
+    filter.status = normalizeCode(req.query.status);
+  }
+  if (req.userRole === "LECTURER") {
+    filter.lecturer_id = req.lecturer?._id;
+    if (!req.query.status) filter.status = "APPROVED";
+  }
 
   let query = Assignment.find(filter)
     .populate({
