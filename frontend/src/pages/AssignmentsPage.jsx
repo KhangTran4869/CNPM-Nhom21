@@ -7,6 +7,7 @@ import { Modal } from "../components/ui/Modal";
 import { Table } from "../components/ui/Table";
 import { assignmentService } from "../services/assignmentService";
 import { classService } from "../services/classService";
+import { catalogService } from "../services/catalogService";
 
 const initialForm = { class_id: "", lecturer_id: "", note: "" };
 
@@ -32,6 +33,8 @@ const errorText = (err) => {
 export function AssignmentsPage({ user, navigate }) {
   const [assignments, setAssignments] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [semesters, setSemesters] = useState([]);
+  const [semesterFilter, setSemesterFilter] = useState("");
   const [schedules, setSchedules] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [history, setHistory] = useState([]);
@@ -54,8 +57,13 @@ export function AssignmentsPage({ user, navigate }) {
   );
 
   const availableClasses = useMemo(
-    () => classes.filter((item) => (item.status === "OPEN" && !assignedClassIds.has(item._id)) || item._id === form.class_id),
-    [classes, assignedClassIds, form.class_id],
+    () => classes.filter((item) => {
+      if (item._id === form.class_id) return true;
+      if (item.status !== "OPEN" || assignedClassIds.has(item._id)) return false;
+      if (semesterFilter && String(item.semester_id?._id || item.semester_id) !== semesterFilter) return false;
+      return true;
+    }),
+    [classes, assignedClassIds, form.class_id, semesterFilter],
   );
 
   const tableRows = useMemo(() => {
@@ -75,8 +83,10 @@ export function AssignmentsPage({ user, navigate }) {
 
   const load = () => {
     setLoading(true);
+    const params = {};
+    if (semesterFilter) params.semester_id = semesterFilter;
     assignmentService
-      .getAssignments()
+      .getAssignments(params)
       .then(setAssignments)
       .catch((err) => {
         console.error("Không thể tải danh sách phân công", err);
@@ -91,7 +101,12 @@ export function AssignmentsPage({ user, navigate }) {
     if (canWrite) {
       classService.getClasses().then(setClasses).catch(() => setClasses([]));
     }
+    catalogService.getSemesters().then(setSemesters).catch(() => setSemesters([]));
   }, [canWrite]);
+
+  useEffect(() => {
+    load();
+  }, [semesterFilter]);
 
   const loadClassContext = async (classId) => {
     if (!classId) {
@@ -105,6 +120,7 @@ export function AssignmentsPage({ user, navigate }) {
     ]);
     setSchedules(nextSchedules);
     setSuggestions((nextSuggestions || []).filter((item) => {
+      if (item.role_code === "HEAD" || item.role_code === "ADMIN") return false;
       const codeUpper = (item.code || "").toUpperCase();
       const nameUpper = (item.name || "").toUpperCase();
       if (codeUpper.includes("TRUONGKHOA") || codeUpper.includes("ADMIN")) return false;
@@ -245,8 +261,8 @@ export function AssignmentsPage({ user, navigate }) {
     setMessage("");
     setError("");
     try {
-      const res = await assignmentService.autoAssign({});
-      setMessage(res?.message || "⚡ Phân công tự động hoàn tất!");
+      const res = await assignmentService.autoAssign(semesterFilter ? { semester_id: semesterFilter } : {});
+      setMessage(res?.message || "Phân công tự động hoàn tất!");
       load();
     } catch (err) {
       setError(errorText(err));
@@ -345,7 +361,7 @@ export function AssignmentsPage({ user, navigate }) {
                 style={{ borderColor: "#10b981", color: "#10b981", fontWeight: 600 }}
                 onClick={autoAssignAll}
               >
-                ⚡ Phân công tự động
+                Phân công tự động
               </Button>
             )}
             {isAdmin && (
@@ -354,15 +370,26 @@ export function AssignmentsPage({ user, navigate }) {
                 style={{ borderColor: "var(--primary-color)", color: "var(--primary-color)", fontWeight: 600 }}
                 onClick={() => navigate?.("/assignments/approval")}
               >
-                ✓ Duyệt đề xuất (Pending)
+                Duyệt đề xuất (Pending)
               </Button>
             )}
             {canWrite && <Button onClick={() => openCreate(false)}>{isHead ? "Đề xuất phân công" : "Thêm phân công"}</Button>}
-            {canViewHistory && <Button variant="outline" onClick={openGlobalHistory}>📜 Lịch sử thay đổi</Button>}
+            {canViewHistory && <Button variant="outline" onClick={openGlobalHistory}>Lịch sử thay đổi</Button>}
             <Button variant="outline" onClick={load}>Làm mới</Button>
           </div>
         }
       >
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
+          <label style={{ fontWeight: 600, fontSize: "14px", color: "#334155", whiteSpace: "nowrap" }}>📅 Lọc theo học kỳ:</label>
+          <select
+            value={semesterFilter}
+            onChange={(e) => setSemesterFilter(e.target.value)}
+            style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", minWidth: "220px", backgroundColor: "#fff" }}
+          >
+            <option value="">Tất cả học kỳ</option>
+            {semesters.map((s) => <option key={s._id} value={s._id}>{s.name}{s.status === "ACTIVE" ? " ⚡" : ""}</option>)}
+          </select>
+        </div>
         {message && <div className="alert success" style={{ marginBottom: "16px", background: "#d1fae5", color: "#065f46", padding: "12px", borderRadius: "6px" }}>{message}</div>}
         {error && !modal && <div className="alert danger">{error}</div>}
         <Table columns={columns} rows={tableRows} loading={loading} />

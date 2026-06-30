@@ -17,27 +17,19 @@ const validateSemesterDates = (start_date, end_date, isCreate = false) => {
 
 export const getAllSemesters = asyncHandler(async (_req, res) => {
   const all = await Semester.find({ is_deleted: false });
-  let planningCount = 0;
   for (const s of all) {
     if (s.start_date && s.end_date && new Date(s.start_date) >= new Date(s.end_date)) {
       s.is_deleted = true;
       await s.save();
       continue;
     }
-    if (!s.status) {
-      if (s.end_date && new Date(s.end_date) < new Date()) {
-        s.status = "COMPLETED";
-      } else {
-        s.status = "PLANNING";
-      }
-      await s.save();
-    }
+    // Migrate old statuses to new 3-status system
     if (s.status === "PLANNING") {
-      planningCount++;
-      if (planningCount > 1) {
-        s.status = "UPCOMING";
-        await s.save();
-      }
+      s.status = "UPCOMING";
+      await s.save();
+    } else if (s.status === "LOCKED") {
+      s.status = "COMPLETED";
+      await s.save();
     }
   }
   const semesters = await Semester.find({ is_deleted: false }).sort({ createdAt: "desc" });
@@ -50,11 +42,7 @@ export const createSemester = asyncHandler(async (req, res) => {
   const dateError = validateSemesterDates(start_date, end_date, true);
   if (dateError) return errorResponse(res, dateError, ["DATE_INVALID"], 400);
 
-  const finalStatus = status || "PLANNING";
-  if (finalStatus === "PLANNING") {
-    await Semester.updateMany({ status: "PLANNING", is_deleted: false }, { $set: { status: "UPCOMING" } });
-  }
-
+  const finalStatus = status || "UPCOMING";
   const semester = await Semester.create({ name: name.trim(), start_date, end_date, status: finalStatus });
   return successResponse(res, semester, "Tạo học kỳ thành công", 201);
 });
@@ -71,10 +59,6 @@ export const updateSemester = asyncHandler(async (req, res) => {
   if (!name || !name.trim()) return errorResponse(res, "Tên học kỳ không được để trống", ["NAME_REQUIRED"], 400);
   const dateError = validateSemesterDates(start_date, end_date, false);
   if (dateError) return errorResponse(res, dateError, ["DATE_INVALID"], 400);
-
-  if (status === "PLANNING" && existing.status !== "PLANNING") {
-    await Semester.updateMany({ _id: { $ne: req.params.id }, status: "PLANNING", is_deleted: false }, { $set: { status: "UPCOMING" } });
-  }
 
   const semester = await Semester.findOneAndUpdate(
     { _id: req.params.id, is_deleted: false },

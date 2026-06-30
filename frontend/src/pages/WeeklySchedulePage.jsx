@@ -170,10 +170,7 @@ export function WeeklySchedulePage({ user }) {
     });
 
   return (
-    <Card
-      title="THỜI KHÓA BIỂU DẠNG TUẦN"
-      actions={<Button variant="outline" onClick={() => window.print()}>In</Button>}
-    >
+    <Card title="THỜI KHÓA BIỂU DẠNG TUẦN">
       <div className="filter-row">
         <Select label="Học kỳ" value={semesterId} onChange={(e) => setSemesterId(e.target.value)}>
           <option value="">Tất cả học kỳ</option>

@@ -8,7 +8,6 @@ export function Header({ user, onMenu, onLogout }) {
         <strong>Hệ thống phân công giảng viên</strong>
       </div>
       <div className="header-user">
-        <span className="bell">🔔</span>
         <div className="avatar">{user?.name?.slice(0, 1)?.toUpperCase() || user?.username?.slice(0, 1)?.toUpperCase() || "U"}</div>
         <div className="user-meta">
           <strong>{user?.name || user?.username || "Người dùng"}</strong>

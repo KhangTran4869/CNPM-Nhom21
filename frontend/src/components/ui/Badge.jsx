@@ -11,6 +11,7 @@ const toneByStatus = {
   NORMAL: "success",
   UNDERLOAD: "danger",
   "Thiếu giờ": "danger",
+  "Đủ giờ": "success",
   "Đủ tải": "success",
   "Vượt tải": "warning",
   ADMIN: "danger",

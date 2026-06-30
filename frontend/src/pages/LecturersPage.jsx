@@ -5,7 +5,6 @@ import { Card } from "../components/ui/Card";
 import { Input, Select } from "../components/ui/Field";
 import { Modal } from "../components/ui/Modal";
 import { Table } from "../components/ui/Table";
-import { api } from "../services/api";
 import { catalogService } from "../services/catalogService";
 import { lecturerService } from "../services/lecturerService";
 
@@ -19,7 +18,7 @@ const emptyForm = {
   faculty: "Khoa Công nghệ thông tin",
   department_id: "",
   user_id: "",
-  max_hours: 120,
+  max_hours: 180,
   status: "ACTIVE",
 };
 
@@ -33,7 +32,7 @@ const toLecturerForm = (lecturer) => ({
   faculty: lecturer?.faculty || "Khoa Công nghệ thông tin",
   department_id: lecturer?.department_id?._id || lecturer?.department_id || "",
   user_id: lecturer?.user_id?._id || lecturer?.user_id || "",
-  max_hours: lecturer?.max_hours || 120,
+  max_hours: lecturer?.max_hours || 180,
   status: lecturer?.status || "ACTIVE",
 });
 
@@ -44,8 +43,8 @@ const toLecturerForm = (lecturer) => ({
 export function LecturersPage({ user }) {
   const [lecturers, setLecturers] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [filters, setFilters] = useState({ keyword: "", department_id: "", status: "" });
+  const [courses, setCourses] = useState([]);
+  const [filters, setFilters] = useState({ keyword: "", faculty: "", department_id: "", course_id: "", status: "" });
   const [form, setForm] = useState(emptyForm);
   const [selectedLecturer, setSelectedLecturer] = useState(null);
   const [modal, setModal] = useState("");
@@ -65,6 +64,21 @@ export function LecturersPage({ user }) {
           if (roleCode === "HEAD" || roleCode === "ADMIN") return false;
           if (codeUpper.includes("TRUONGKHOA") || codeUpper.includes("ADMIN")) return false;
           if (nameUpper.includes("TRƯỞNG KHOA") || nameUpper === "ADMIN") return false;
+          if (filters.faculty) {
+            const fac = item.faculty || item.department_id?.description;
+            if (fac !== filters.faculty) return false;
+          }
+          if (user?.role === "HEAD" && user?.faculty) {
+            if (item.faculty !== user.faculty && item.department_id?.description !== user.faculty) return false;
+          }
+          if (filters.course_id) {
+            const targetCourse = courses.find(c => String(c._id) === String(filters.course_id));
+            if (targetCourse) {
+              const matchDept = targetCourse.department_id && String(item.department_id?._id || item.department_id) === String(targetCourse.department_id?._id || targetCourse.department_id);
+              const matchPref = item.preferences && item.preferences.toLowerCase().includes((targetCourse.name || "").toLowerCase());
+              if (!matchDept && !matchPref) return false;
+            }
+          }
           return true;
         });
         setLecturers(list);
@@ -73,29 +87,23 @@ export function LecturersPage({ user }) {
       .finally(() => setLoading(false));
   };
 
-  const loadDepartments = () =>
-    catalogService
-      .getDepartments()
-      .then((data) => {
-        setDepartments(data);
-        return data;
-      })
-      .catch(() => {
-        setDepartments([]);
-        return [];
-      });
-
-  // Chỉ tải danh sách User khi người đăng nhập là Admin (tránh lỗi 403 Forbidden cho Trưởng khoa)
-  const loadUsers = () => {
-    api.get("/users").then((data) => setUsers(data || [])).catch(() => setUsers([]));
+  const loadDepartments = async () => {
+    try {
+      const depts = await catalogService.getDepartments();
+      setDepartments(depts || []);
+      catalogService.getCourses().then(setCourses).catch(() => setCourses([]));
+      return depts || [];
+    } catch {
+      setDepartments([]);
+      return [];
+    }
   };
 
   useEffect(() => {
     loadDepartments();
-    if (isAdmin) loadUsers();
-  }, [isAdmin]);
+  }, []);
 
-  useEffect(load, [filters]);
+  useEffect(load, [filters, courses, user]);
 
   // Xử lý gửi form Thêm mới hoặc Cập nhật Giảng viên
   const submit = async (event) => {
@@ -118,7 +126,6 @@ export function LecturersPage({ user }) {
       setForm(emptyForm);
       setSelectedLecturer(null);
       load();
-      if (isAdmin) loadUsers();
     } catch (err) {
       setError(
         err.payload?.errors?.map((item) => item.message || item.rule || item).join(", ") ||
@@ -132,9 +139,12 @@ export function LecturersPage({ user }) {
     setError("");
     setSelectedLecturer(null);
     const nextDepartments = await loadDepartments();
+    const initFaculty = isAdmin ? "Khoa Công nghệ thông tin" : (user?.faculty || "Khoa Công nghệ thông tin");
+    const matchingDepts = (nextDepartments || []).filter(d => d.description === initFaculty);
     setForm({
       ...emptyForm,
-      department_id: nextDepartments?.[0]?._id || departments[0]?._id || "",
+      faculty: initFaculty,
+      department_id: matchingDepts?.[0]?._id || nextDepartments?.[0]?._id || "",
       user_id: "",
     });
     setModal("Thêm giảng viên");
@@ -189,18 +199,31 @@ export function LecturersPage({ user }) {
     <>
       <Card
         title="Quản lý giảng viên"
-        actions={isAdmin && <Button onClick={openCreate}>Thêm giảng viên</Button>}
+        actions={null}
       >
         <div className="filter-row">
           <Input label="Tìm kiếm" value={filters.keyword} onChange={(e) => setFilters({ ...filters, keyword: e.target.value })} placeholder="Tên, mã GV..." />
+          {user?.role !== "HEAD" && (
+            <Select label="Khoa" value={filters.faculty} onChange={(e) => setFilters({ ...filters, faculty: e.target.value, department_id: "" })}>
+              <option value="">Tất cả các khoa</option>
+              <option value="Khoa Công nghệ thông tin">Khoa Công nghệ thông tin</option>
+              <option value="Khoa Viễn thông">Khoa Viễn thông</option>
+              <option value="Khoa Quản trị Kinh doanh">Khoa Quản trị Kinh doanh</option>
+            </Select>
+          )}
           <Select label="Bộ môn" value={filters.department_id} onChange={(e) => setFilters({ ...filters, department_id: e.target.value })}>
             <option value="">Tất cả bộ môn</option>
-            {departments.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
+            {departments
+              .filter((item) => {
+                if (user?.role === "HEAD" && user?.faculty) return item.description === user.faculty;
+                if (filters.faculty) return item.description === filters.faculty;
+                return true;
+              })
+              .map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
           </Select>
           <Select label="Trạng thái" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
             <option value="">Tất cả</option>
             <option value="ACTIVE">ACTIVE</option>
-            <option value="BUSY">BUSY</option>
             <option value="INACTIVE">INACTIVE</option>
           </Select>
         </div>
@@ -246,12 +269,6 @@ export function LecturersPage({ user }) {
             <span>Trạng thái</span>
             <div className="alert"><Badge>{selectedLecturer?.status || "N/A"}</Badge></div>
           </label>
-          {selectedLecturer?.user_id && (
-            <label className="field wide">
-              <span>Tài khoản liên kết</span>
-              <div className="alert">{selectedLecturer.user_id?.username || selectedLecturer.user_id?._id || "N/A"}</div>
-            </label>
-          )}
           {isAdmin && (
             <div className="form-actions">
               <Button variant="outline" onClick={() => openEdit(selectedLecturer)}>Sửa thông tin</Button>
@@ -268,21 +285,27 @@ export function LecturersPage({ user }) {
           <Input label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <Input label="Số điện thoại" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           <Input label="Học vị" value={form.degree} onChange={(e) => setForm({ ...form, degree: e.target.value })} placeholder="ThS, TS, PGS.TS..." />
-          <Input label="Khoa trực thuộc" value={form.faculty} onChange={(e) => setForm({ ...form, faculty: e.target.value })} placeholder="VD: Khoa Công nghệ thông tin" />
-          <Select label="Bộ môn" value={form.department_id} onChange={(e) => setForm({ ...form, department_id: e.target.value })}>
-            <option value="">{departments.length ? "Chọn bộ môn" : "Chưa có bộ môn"}</option>
-            {departments.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
+          <Select label="Khoa trực thuộc" value={form.faculty} onChange={(e) => {
+            const newFac = e.target.value;
+            const matching = departments.filter(d => d.description === newFac);
+            setForm({ ...form, faculty: newFac, department_id: matching[0]?._id || "" });
+          }} required>
+            <option value="Khoa Công nghệ thông tin">Khoa Công nghệ thông tin</option>
+            <option value="Khoa Viễn thông">Khoa Viễn thông</option>
+            <option value="Khoa Quản trị Kinh doanh">Khoa Quản trị Kinh doanh</option>
           </Select>
-          <Select label="Tài khoản đăng nhập liên kết" value={form.user_id} onChange={(e) => setForm({ ...form, user_id: e.target.value })}>
-            <option value="">Tự động tạo mới (Username = Mã GV, Pass = 123456)</option>
-            {users.filter(u => !u.lecturer_id && u.role !== "ADMIN").map((u) => (
-              <option key={u.id || u._id} value={u.id || u._id}>{u.username} ({u.role || "USER"})</option>
-            ))}
+          <Select label="Bộ môn" value={form.department_id} onChange={(e) => {
+            const dept = departments.find(d => String(d._id) === String(e.target.value));
+            setForm({ ...form, department_id: e.target.value, faculty: dept?.description || form.faculty });
+          }}>
+            <option value="">{departments.length ? "Chọn bộ môn" : "Chưa có bộ môn"}</option>
+            {departments
+              .filter((item) => !form.faculty || item.description === form.faculty)
+              .map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
           </Select>
           <Input label="Giờ chuẩn tối đa" type="number" value={form.max_hours} onChange={(e) => setForm({ ...form, max_hours: Number(e.target.value) })} />
           <Select label="Trạng thái" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
             <option value="ACTIVE">ACTIVE</option>
-            <option value="BUSY">BUSY</option>
             <option value="INACTIVE">INACTIVE</option>
           </Select>
           {error && <div className="alert danger">{error}</div>}

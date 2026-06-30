@@ -122,7 +122,7 @@ export function AssignmentApprovalPage({ navigate }) {
         actions={
           <div className="row-actions">
             <Button variant="outline" onClick={() => navigate?.("/assignments")}>
-              ⬅ Xem toàn bộ danh sách
+              Xem toàn bộ danh sách
             </Button>
             <Button variant="outline" onClick={load}>Làm mới</Button>
           </div>

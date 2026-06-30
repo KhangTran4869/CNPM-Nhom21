@@ -11,8 +11,8 @@ const assertNotLocked = async (class_id) => {
   const cls = await Class.findById(class_id);
   if (!cls || !cls.semester_id) return;
   const sem = await Semester.findById(cls.semester_id);
-  if (sem && sem.status === "LOCKED") {
-    throw new ApiError(`Học kỳ "${sem.name}" đã KHÓA. Không cho phép sửa đổi phân công giảng dạy!`, 403, ["SEMESTER_LOCKED"]);
+  if (sem && sem.status === "COMPLETED") {
+    throw new ApiError(`Học kỳ "${sem.name}" đã kết thúc. Không cho phép sửa đổi phân công giảng dạy!`, 403, ["SEMESTER_COMPLETED"]);
   }
 };
 

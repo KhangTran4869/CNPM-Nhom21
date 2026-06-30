@@ -26,7 +26,7 @@ export const getAllAssignments = asyncHandler(async (req, res) => {
   let query = Assignment.find(filter)
     .populate({
       path: "class_id",
-      populate: [{ path: "course_id" }, { path: "semester_id" }],
+      populate: [{ path: "course_id", populate: { path: "department_id" } }, { path: "semester_id" }],
     })
     .populate({ path: "lecturer_id", populate: "department_id" })
     .populate("assigned_by")
@@ -48,6 +48,13 @@ export const getAllAssignments = asyncHandler(async (req, res) => {
         String(item.class_id?.course_id?.department_id?._id || item.class_id?.course_id?.department_id) ===
           String(req.query.department_id),
     );
+  }
+  if (req.userRole === "HEAD" && req.userFaculty) {
+    assignments = assignments.filter((item) => {
+      const classFac = item.class_id?.course_id?.department_id?.description;
+      const lecFac = item.lecturer_id?.faculty || item.lecturer_id?.department_id?.description;
+      return classFac === req.userFaculty || lecFac === req.userFaculty;
+    });
   }
   return successResponse(res, assignments);
 });
@@ -154,15 +161,19 @@ export const autoAssign = asyncHandler(async (req, res) => {
   const { semester_id } = req.body;
   if (semester_id) {
     const sem = await Semester.findById(semester_id);
-    if (sem && (sem.status === "COMPLETED" || sem.status === "LOCKED")) {
-      return errorResponse(res, `Không cho phép chạy thuật toán cho học kỳ "${sem.name}" đang ở trạng thái ${sem.status === "COMPLETED" ? "Đã kết thúc" : "Đã khóa"}!`, ["SEMESTER_RESTRICTED"], 403);
+    if (sem && sem.status === "COMPLETED") {
+      return errorResponse(res, `Không cho phép chạy thuật toán cho học kỳ "${sem.name}" đang ở trạng thái "Đã kết thúc"!`, ["SEMESTER_RESTRICTED"], 403);
     }
   }
 
   const classFilter = { is_deleted: false };
   if (semester_id) classFilter.semester_id = semester_id;
 
-  const classes = await Class.find(classFilter);
+  let classes = await Class.find(classFilter).populate({ path: "course_id", populate: "department_id" });
+  if (req.userRole === "HEAD" && req.userFaculty) {
+    classes = classes.filter((c) => c.course_id?.department_id?.description === req.userFaculty);
+  }
+
   let assignedCount = 0;
   let skippedCount = 0;
   const results = [];
@@ -170,9 +181,9 @@ export const autoAssign = asyncHandler(async (req, res) => {
   for (const cls of classes) {
     if (cls.semester_id && !semester_id) {
       const sem = await Semester.findById(cls.semester_id);
-      if (sem && (sem.status === "COMPLETED" || sem.status === "LOCKED")) {
+      if (sem && sem.status === "COMPLETED") {
         skippedCount++;
-        results.push({ class_code: cls.code, status: "FAILED", reason: `Học kỳ đang ở trạng thái ${sem.status === "COMPLETED" ? "Đã kết thúc" : "Đã khóa"}` });
+        results.push({ class_code: cls.code, status: "FAILED", reason: "Học kỳ đang ở trạng thái Đã kết thúc" });
         continue;
       }
     }
@@ -211,6 +222,6 @@ export const autoAssign = asyncHandler(async (req, res) => {
   return successResponse(
     res,
     { assignedCount, skippedCount, details: results },
-    `⚡ Phân công tự động hoàn tất: Đã sinh đề xuất cho ${assignedCount} lớp, bỏ qua ${skippedCount} lớp.`
+    `Phân công tự động hoàn tất: Đã sinh đề xuất cho ${assignedCount} lớp, bỏ qua ${skippedCount} lớp.`
   );
 });

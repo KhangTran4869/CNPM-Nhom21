@@ -54,7 +54,7 @@ const lecturerSchema = new mongoose.Schema(
 
     max_hours: {
       type: Number,
-      default: null,
+      default: 180,
     },
 
     // Bổ sung: Số giờ đã dạy thực tế của giảng viên (do giảng viên cập nhật hoặc hệ thống tính toán)

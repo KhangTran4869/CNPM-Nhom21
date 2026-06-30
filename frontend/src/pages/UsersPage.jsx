@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -15,11 +15,12 @@ const emptyForm = {
   password: "",
   role_id: "",
   status: "ACTIVE",
+  faculty: "Khoa Công nghệ thông tin",
 };
 
 export function UsersPage({ user }) {
   const { filteredRows, keyword, setKeyword, loading, error, setError, load } = useResourceList("/users", {
-    searchKeys: ["username", "role_id.code", "role", "status"],
+    searchKeys: ["username", "role_id.code", "role", "status", "faculty"],
   });
   const [roles, setRoles] = useState([]);
   const [modal, setModal] = useState("");
@@ -48,6 +49,7 @@ export function UsersPage({ user }) {
       password: "",
       role_id: row.role_id?._id || row.role_id || "",
       status: row.status || "ACTIVE",
+      faculty: row.faculty || "Khoa Công nghệ thông tin",
     });
     setModal("Sửa tài khoản");
   };
@@ -58,20 +60,20 @@ export function UsersPage({ user }) {
     setMessage("");
     try {
       if (selectedUser) {
-        const payload = { role_id: form.role_id, status: form.status, username: form.username };
+        const payload = { role_id: form.role_id, status: form.status, username: form.username, faculty: form.faculty };
         if (form.password.trim()) payload.password = form.password;
-        await api.put(`/users/${selectedUser._id}`, payload);
+        await api.put(`/users/${selectedUser._id || selectedUser.id}`, payload);
         setMessage("Cập nhật tài khoản thành công");
       } else {
         await api.post("/users", form);
-        setMessage("Thêm mới tài khoản thành công");
+        setMessage("Tạo tài khoản thành công");
       }
       setModal("");
       setSelectedUser(null);
       setForm(emptyForm);
       load();
     } catch (err) {
-      setError(errorText(err, "Không thể lưu tài khoản"));
+      setError(errorText(err));
     }
   };
 
@@ -80,8 +82,8 @@ export function UsersPage({ user }) {
     setError("");
     setMessage("");
     try {
-      await api.delete(`/users/${row._id}`);
-      setMessage(`Đã xóa tài khoản ${row.username}`);
+      await api.delete(`/users/${row._id || row.id}`);
+      setMessage("Xóa tài khoản thành công");
       load();
     } catch (err) {
       setError(errorText(err));
@@ -90,7 +92,15 @@ export function UsersPage({ user }) {
 
   const columns = [
     { key: "username", title: "Username" },
-    { key: "role", title: "Role", render: (row) => row.role || row.role_id?.code || "N/A" },
+    {
+      key: "role",
+      title: "Vai trò & Khoa",
+      render: (row) => {
+        const rCode = row.role_id?.code || row.role || "";
+        const rName = row.role_id?.name || row.role || "N/A";
+        return (rCode === "HEAD" || rCode === "LECTURER") && row.faculty ? `${rName} (${row.faculty})` : rName;
+      },
+    },
     { key: "status", title: "Trạng thái", render: (row) => <Badge>{row.status}</Badge> },
     {
       key: "actions",
@@ -110,6 +120,20 @@ export function UsersPage({ user }) {
     },
   ];
 
+  const selectedRoleObj = roles.find((r) => String(r._id) === String(form.role_id));
+  const roleCode = selectedRoleObj?.code || selectedUser?.role_id?.code || selectedUser?.role || "";
+
+  const sortedRows = useMemo(() => {
+    if (!Array.isArray(filteredRows)) return [];
+    return [...filteredRows].sort((a, b) => {
+      const isA = user && (a._id === user._id || a.id === user.id || a.username === user.username);
+      const isB = user && (b._id === user._id || b.id === user.id || b.username === user.username);
+      if (isA && !isB) return -1;
+      if (!isA && isB) return 1;
+      return 0;
+    });
+  }, [filteredRows, user]);
+
   return (
     <>
       <Card
@@ -126,7 +150,7 @@ export function UsersPage({ user }) {
         </div>
         {message && <div className="alert success">{message}</div>}
         {error && <div className="alert danger">{error}</div>}
-        <Table columns={columns} rows={filteredRows} loading={loading} />
+        <Table columns={columns} rows={sortedRows} loading={loading} />
       </Card>
 
       <Modal title={modal} onClose={() => setModal("")}>
@@ -139,6 +163,13 @@ export function UsersPage({ user }) {
               <option key={role._id} value={role._id}>{role.name} ({role.code})</option>
             ))}
           </Select>
+          {(roleCode === "HEAD" || roleCode === "LECTURER") && (
+            <Select label="Khoa quản lý / trực thuộc" value={form.faculty} onChange={(event) => setForm({ ...form, faculty: event.target.value })} required>
+              <option value="Khoa Công nghệ thông tin">Khoa Công nghệ thông tin</option>
+              <option value="Khoa Viễn thông">Khoa Viễn thông</option>
+              <option value="Khoa Quản trị Kinh doanh">Khoa Quản trị Kinh doanh</option>
+            </Select>
+          )}
           <Select label="Trạng thái" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
             <option value="ACTIVE">ACTIVE</option>
             <option value="INACTIVE">INACTIVE</option>

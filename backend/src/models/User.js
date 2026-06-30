@@ -17,6 +17,11 @@ const userSchema = new mongoose.Schema(
       ref: "Role",
       default: null,
     },
+    faculty: {
+      type: String,
+      trim: true,
+      default: "Khoa Công nghệ thông tin",
+    },
     status: {
       type: String,
       enum: ["ACTIVE", "INACTIVE"],

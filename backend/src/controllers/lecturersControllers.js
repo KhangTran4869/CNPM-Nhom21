@@ -1,4 +1,5 @@
 import Assignment from "../models/Assignment.js";
+import Course from "../models/Course.js";
 import Department from "../models/Department.js";
 import Lecturer from "../models/Lecturer.js";
 import Role from "../models/Role.js";
@@ -75,6 +76,10 @@ export const getAllLecturers = asyncHandler(async (req, res) => {
       { email: { $regex: req.query.keyword, $options: "i" } },
     ];
   }
+  let targetCourse = null;
+  if (req.query.course_id) {
+    targetCourse = await Course.findById(req.query.course_id).catch(() => null);
+  }
   const page = Number(req.query.page || 1);
   const limit = Number(req.query.limit || 50);
   const allLecturers = await Lecturer.find(filter)
@@ -89,6 +94,18 @@ export const getAllLecturers = asyncHandler(async (req, res) => {
     const nameStr = (item.name || "").toUpperCase();
     if (codeStr.includes("TRUONGKHOA") || codeStr.includes("ADMIN")) return false;
     if (nameStr.includes("TRƯỞNG KHOA") || nameStr === "ADMIN") return false;
+    if (req.query.faculty) {
+      const fac = item.faculty || item.department_id?.description;
+      if (fac !== req.query.faculty) return false;
+    }
+    if (req.userRole === "HEAD" && req.userFaculty) {
+      if (item.faculty !== req.userFaculty && item.department_id?.description !== req.userFaculty) return false;
+    }
+    if (targetCourse) {
+      const matchDept = targetCourse.department_id && String(item.department_id?._id || item.department_id) === String(targetCourse.department_id);
+      const matchPref = item.preferences && item.preferences.toLowerCase().includes((targetCourse.name || "").toLowerCase());
+      if (!matchDept && !matchPref) return false;
+    }
     return true;
   });
 
@@ -153,7 +170,7 @@ export const createLecturer = asyncHandler(async (req, res) => {
     faculty,
     department_id,
     user_id: account.user._id,
-    max_hours,
+    max_hours: max_hours ? Number(max_hours) : 180,
     preferences,
     taught_hours: Number(taught_hours) || 0,
     status: normalizeCode(status),
@@ -255,7 +272,7 @@ export const getWorkload = asyncHandler(async (req, res) => {
   }
   const lecturer = await Lecturer.findOne({ _id: req.params.lecturer_id, is_deleted: false });
   if (!lecturer) return errorResponse(res, "Giảng viên không tồn tại", ["LECTURER_NOT_FOUND"], 404);
-  const totalHours = await getCurrentHours(lecturer._id, req.query.semester_id);
+  const totalHours = await getCurrentHours(lecturer._id, req.query.semester_id, null, true);
   const remainingHours = Number(lecturer.max_hours || 0) - totalHours;
   return successResponse(res, {
     lecturer_id: lecturer._id,

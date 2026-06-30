@@ -13,7 +13,7 @@ const menu = {
     { path: "/lecturers", label: "Danh sách giảng viên" },
     { path: "/classes", label: "Danh sách lớp tín chỉ" },
     { path: "/assignments", label: "Đề xuất phân công" },
-    { path: "/reports", label: "Khối lượng giảng dạy" },
+    { path: "/reports", label: "Báo cáo thống kê" },
   ],
   ADMIN: [
     { path: "/users", label: "Quản lý tài khoản" },

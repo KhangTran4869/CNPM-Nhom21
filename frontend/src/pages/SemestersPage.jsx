@@ -12,22 +12,20 @@ const emptyForm = {
   name: "",
   start_date: "",
   end_date: "",
-  status: "PLANNING",
+  status: "UPCOMING",
 };
 
 const toForm = (semester) => ({
   name: semester?.name || "",
   start_date: toDateInput(semester?.start_date),
   end_date: toDateInput(semester?.end_date),
-  status: semester?.status || "PLANNING",
+  status: semester?.status || "UPCOMING",
 });
 
 const statusLabels = {
-  PLANNING: { text: "Đang lập kế hoạch", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
   UPCOMING: { text: "Chưa mở", color: "#475569", bg: "#f8fafc", border: "#cbd5e1" },
   ACTIVE: { text: "Đang diễn ra", color: "#059669", bg: "#ecfdf5", border: "#a7f3d0" },
   COMPLETED: { text: "Đã kết thúc", color: "#6b7280", bg: "#f3f4f6", border: "#d1d5db" },
-  LOCKED: { text: "Đã khóa", color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
 };
 
 export function SemestersPage() {
@@ -103,7 +101,7 @@ export function SemestersPage() {
       key: "status",
       title: "Trạng thái",
       render: (row) => {
-        const cfg = statusLabels[row.status] || statusLabels.PLANNING;
+        const cfg = statusLabels[row.status] || statusLabels.UPCOMING;
         return (
           <span style={{
             padding: "4px 10px",
@@ -162,11 +160,9 @@ export function SemestersPage() {
               onChange={(event) => setForm({ ...form, status: event.target.value })}
               style={{ width: "100%", padding: "10px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", backgroundColor: "#fff" }}
             >
-              <option value="PLANNING">Đang lập kế hoạch (Chỉ cho phép 1 học kỳ)</option>
               <option value="UPCOMING">Chưa mở</option>
-              <option value="ACTIVE">Đang diễn ra</option>
-              <option value="COMPLETED">Đã kết thúc (Khóa chạy thuật toán)</option>
-              <option value="LOCKED">Đã khóa (Khóa sửa đổi phân công)</option>
+              <option value="ACTIVE">Đang diễn ra (Cho phép tạo lớp & phân công)</option>
+              <option value="COMPLETED">Đã kết thúc (Khóa mọi thay đổi)</option>
             </select>
           </div>
           {error && <div className="alert danger" style={{ gridColumn: "1 / -1" }}>{error}</div>}

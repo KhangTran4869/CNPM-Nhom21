@@ -51,7 +51,7 @@ export function renderPage({ path, user, navigate, setUser }) {
 
   switch (path) {
     case "/home":
-      return <HomePage user={user} navigate={navigate} />;
+      return <HomePage user={user} navigate={navigate} onUserChange={setUser} />;
     case "/teaching-schedule/weekly":
       return <WeeklySchedulePage user={user} />;
     case "/teaching-schedule/semester":

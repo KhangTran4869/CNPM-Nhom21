@@ -64,13 +64,14 @@ const syncLecturerWithUser = async (user, role_id) => {
         email: `${user.username}@gmail.com`,
         phone: "",
         degree: roleDoc.code === "HEAD" ? "Tiến sĩ" : "Thạc sĩ",
-        faculty: "Khoa Công nghệ thông tin",
+        faculty: user.faculty || "Khoa Công nghệ thông tin",
         department_id: defaultDept ? defaultDept._id : null,
         user_id: user._id,
         status: user.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
       });
     } else {
       lecturer.status = user.status === "ACTIVE" ? "ACTIVE" : "INACTIVE";
+      if (user.faculty) lecturer.faculty = user.faculty;
       await lecturer.save();
     }
   }
@@ -81,7 +82,7 @@ const syncLecturerWithUser = async (user, role_id) => {
  * Nếu tạo vai trò LECTURER hoặc HEAD -> tự động đồng bộ hồ sơ vào danh sách giảng viên.
  */
 export const createUser = asyncHandler(async (req, res) => {
-  const { username, password, role_id, status = "ACTIVE" } = req.body;
+  const { username, password, role_id, status = "ACTIVE", faculty = "Khoa Công nghệ thông tin" } = req.body;
   const errors = [];
   if (!username) errors.push("USERNAME_REQUIRED");
   if (!password || password.length < 6) errors.push("PASSWORD_MIN_6");
@@ -96,6 +97,7 @@ export const createUser = asyncHandler(async (req, res) => {
     password_hash,
     role_id,
     status: normalizeCode(status),
+    faculty,
     must_change_password: password === "123456",
   });
 
@@ -133,6 +135,10 @@ export const updateUser = asyncHandler(async (req, res) => {
     updates.status = status;
   }
 
+  if (req.body.faculty !== undefined) {
+    updates.faculty = req.body.faculty;
+  }
+
   if (req.body.username && req.body.username.trim() !== "") {
     const newUsername = req.body.username.trim();
     const existing = await User.findOne({ username: newUsername, _id: { $ne: req.params.id }, is_deleted: false });
@@ -150,10 +156,13 @@ export const updateUser = asyncHandler(async (req, res) => {
 
   if (!user) return errorResponse(res, "Người dùng không tồn tại", ["USER_NOT_FOUND"], 404);
 
-  if (updates.username) {
+  if (updates.username || updates.faculty) {
+    const lecUpdates = {};
+    if (updates.username) lecUpdates.name = updates.username;
+    if (updates.faculty) lecUpdates.faculty = updates.faculty;
     await Lecturer.findOneAndUpdate(
       { user_id: user._id, is_deleted: false },
-      { name: updates.username }
+      lecUpdates
     );
   }
 

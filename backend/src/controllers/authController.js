@@ -18,7 +18,7 @@ const publicUser = async (user) => {
     .populate("department_id")
     .lean();
 
-  if (!lecturer && roleCodeOf(user) === "LECTURER") {
+  if (!lecturer && (roleCodeOf(user) === "LECTURER" || roleCodeOf(user) === "HEAD")) {
     lecturer = await Lecturer.findOne({
       $or: [{ code: user.username?.toUpperCase() }, { email: user.email }],
       is_deleted: false,
@@ -33,7 +33,8 @@ const publicUser = async (user) => {
         name: user.username,
         email: user.email || "",
         phone: "",
-        degree: "",
+        degree: roleCodeOf(user) === "HEAD" ? "Tiến sĩ" : "Thạc sĩ",
+        faculty: user.faculty || "Khoa Công nghệ thông tin",
         taught_hours: 0,
       });
       lecturer = newLec.toObject();
@@ -55,7 +56,7 @@ const publicUser = async (user) => {
     email: lecturer?.email || null,
     phone: lecturer?.phone || null,
     degree: lecturer?.degree || null,
-    faculty: lecturer?.faculty || "Khoa Công nghệ thông tin",
+    faculty: user.faculty || lecturer?.faculty || "Khoa Công nghệ thông tin",
     department: lecturer?.department_id?.name || null,
     department_id: lecturer?.department_id?._id || null,
     max_hours: lecturer?.max_hours || null,
@@ -158,7 +159,7 @@ export const updateProfile = asyncHandler(async (req, res) => {
       degree: degree || "",
       preferences: preferences || null,
       taught_hours: Number(taught_hours) || 0,
-      faculty: "Khoa Công nghệ thông tin",
+      faculty: req.user.faculty || "Khoa Công nghệ thông tin",
       status: "ACTIVE",
     });
   } else {

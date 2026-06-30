@@ -187,7 +187,7 @@ export function ClassesPage({ user }) {
             <div>
               <strong style={{ color: "#0369a1" }}>{row.assigned_lecturer}</strong>
               {row.assignment_status === "PENDING" && (
-                <span style={{ display: "block", fontSize: "0.8rem", color: "#d97706" }}>⏳ Đang chờ duyệt</span>
+                <span style={{ display: "block", fontSize: "0.8rem", color: "#d97706" }}>Đang chờ duyệt</span>
               )}
             </div>
           );
@@ -229,10 +229,10 @@ export function ClassesPage({ user }) {
           return <span style={{ fontStyle: "italic", color: "#94a3b8" }}>Lớp đã hủy</span>;
         }
         if (row.status === "ACTIVE") {
-          return <span style={{ fontStyle: "italic", color: "#3b82f6", fontWeight: 500 }}>📖 Đang giảng dạy (Khóa thao tác)</span>;
+          return <span style={{ fontStyle: "italic", color: "#3b82f6", fontWeight: 500 }}>Đang giảng dạy (Khóa thao tác)</span>;
         }
         if (row.status === "COMPLETED") {
-          return <span style={{ fontStyle: "italic", color: "#10b981", fontWeight: 500 }}>🏁 Đã kết thúc (Lưu trữ lịch sử)</span>;
+          return <span style={{ fontStyle: "italic", color: "#10b981", fontWeight: 500 }}>Đã kết thúc (Lưu trữ lịch sử)</span>;
         }
 
         const isAssigned = row.assignment_status === "APPROVED" || row.status === "ASSIGNED";
@@ -309,6 +309,11 @@ export function ClassesPage({ user }) {
     },
   ];
 
+  const availableCourses = catalog.courses.filter(
+    (item) => !user?.role || user?.role !== "HEAD" || !user?.faculty || !item.department_id?.description || item.department_id?.description === user.faculty
+  );
+  const displayColumns = isAdmin ? columns : columns.filter((col) => col.key !== "actions");
+
   return (
     <>
       <div className="page-header">
@@ -324,11 +329,11 @@ export function ClassesPage({ user }) {
           </Select>
           <Select label="Môn học" value={filters.course_id} onChange={(e) => setFilters({ ...filters, course_id: e.target.value })}>
             <option value="">Tất cả</option>
-            {catalog.courses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
+            {availableCourses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
           </Select>
         </div>
       </Card>
-      <Table columns={columns} rows={classes} loading={loading} />
+      <Table columns={displayColumns} rows={classes} loading={loading} />
       <Modal open={Boolean(modal)} title={modal} onClose={() => setModal("")}>
         {modal === "Tạo lớp tín chỉ" || modal === "Sửa lớp tín chỉ" ? (
           <form className="form-grid" onSubmit={saveClass}>
@@ -336,11 +341,11 @@ export function ClassesPage({ user }) {
             <Input label="Mã lớp" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
             <Select label="Môn học" value={form.course_id} onChange={(e) => setForm({ ...form, course_id: e.target.value })}>
               <option value="">Chọn môn</option>
-              {catalog.courses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
+              {availableCourses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
             </Select>
             <Select label="Học kỳ" value={form.semester_id} onChange={(e) => setForm({ ...form, semester_id: e.target.value })}>
               <option value="">Chọn học kỳ</option>
-              {catalog.semesters.filter((item) => ["PLANNING", "UPCOMING"].includes(item.status)).map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
+              {catalog.semesters.filter((item) => item.status === "ACTIVE").map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
             </Select>
             <Input label="Số SV tối đa" type="number" min="25" value={form.max_students} onChange={(e) => setForm({ ...form, max_students: e.target.value })} />
             <Button className="form-submit" type="submit">Lưu</Button>
@@ -371,11 +376,10 @@ export function ClassesPage({ user }) {
                 { key: "group_code", title: "Nhóm", render: (row) => row.group_code || "N/A" },
                 { key: "period", title: "Tiết", render: (row) => `${row.start_period} - ${row.end_period}` },
                 { key: "room", title: "Phòng", render: (row) => row.room_id?.name || "N/A" },
-                {
+                ...(isAdmin ? [{
                   key: "actions",
                   title: "Hành động",
                   render: (row) => {
-                    if (!isAdmin) return null;
                     const isSelectedLocked = selectedClass && (
                       selectedClass.assignment_status === "APPROVED" ||
                       selectedClass.status === "ASSIGNED" ||
@@ -385,7 +389,7 @@ export function ClassesPage({ user }) {
                     );
                     if (isSelectedLocked) {
                       const msg = selectedClass.status === "CANCELLED" ? "Lớp đã hủy" : (selectedClass.status === "ACTIVE" || selectedClass.status === "COMPLETED") ? "Đã chốt lịch" : "Thu hồi để sửa";
-                      return <span style={{ fontStyle: "italic", color: "#d97706", fontSize: "0.85rem" }}>🔒 Đã khóa ({msg})</span>;
+                      return <span style={{ fontStyle: "italic", color: "#d97706", fontSize: "0.85rem" }}>Đã khóa ({msg})</span>;
                     }
                     return (
                       <div style={{ display: "flex", gap: "6px" }}>
@@ -405,14 +409,14 @@ export function ClassesPage({ user }) {
                       </div>
                     );
                   },
-                },
+                }] : []),
               ]}
               rows={schedules}
             />
             {isAdmin && selectedClass && (
               (selectedClass.assignment_status === "APPROVED" || selectedClass.status === "ASSIGNED" || selectedClass.status === "ACTIVE" || selectedClass.status === "COMPLETED" || selectedClass.status === "CANCELLED") ? (
                 <div className="alert warning" style={{ background: "#fef3c7", color: "#92400e", padding: "12px", borderRadius: "6px", textAlign: "center", fontSize: "0.9rem", border: "1px solid #f59e0b" }}>
-                  🔒 <b>{selectedClass.status === "CANCELLED" ? "Lớp tín chỉ này đã bị HỦY." : selectedClass.status === "ACTIVE" ? "Môn học đang diễn ra trong học kỳ." : selectedClass.status === "COMPLETED" ? "Môn học đã kết thúc học kỳ." : "Lớp tín chỉ đã được phân công giảng viên."}</b><br/>
+                  <b>{selectedClass.status === "CANCELLED" ? "Lớp tín chỉ này đã bị HỦY." : selectedClass.status === "ACTIVE" ? "Môn học đang diễn ra trong học kỳ." : selectedClass.status === "COMPLETED" ? "Môn học đã kết thúc học kỳ." : "Lớp tín chỉ đã được phân công giảng viên."}</b><br/>
                   {selectedClass.status === "CANCELLED" ? "Toàn bộ thao tác thêm, sửa hoặc xóa thời khóa biểu đều bị khóa." : (selectedClass.status === "ACTIVE" || selectedClass.status === "COMPLETED") ? "Thời khóa biểu đã được chốt cố định và khóa bảo vệ." : "Vui lòng nhấn nút [Thu hồi] ở danh sách lớp ngoài trang chủ để gỡ giảng viên trước khi thêm hoặc sửa lịch học!"}
                 </div>
               ) : (

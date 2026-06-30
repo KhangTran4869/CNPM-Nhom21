@@ -46,7 +46,7 @@ export function LecturerHome({ user, navigate, onUserChange }) {
             Cập nhật thông tin cá nhân
           </Button>
           <Button variant="outline" onClick={() => navigate?.("/availability")} style={{ flex: 1, minWidth: "200px" }}>
-            Khai báo nguyện vọng & Lịch rảnh/bận
+            Khai báo lịch bận giảng dạy
           </Button>
         </div>
       </Card>

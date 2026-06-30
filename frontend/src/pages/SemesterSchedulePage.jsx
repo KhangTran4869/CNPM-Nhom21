@@ -171,58 +171,8 @@ export function SemesterSchedulePage({ user }) {
 
   const rows = useMemo(() => flattenRows(items, semesterId), [items, semesterId]);
 
-  const exportExcel = () => {
-    const header = [
-      "Mã MH",
-      "Tên môn học",
-      "Nhóm tổ",
-      "Số tín chỉ",
-      "Lớp",
-      "Lịch học",
-      "Phòng",
-      "Giảng viên",
-      "Thời gian",
-    ];
-    const lines = [header];
-
-    rows.forEach(({ cls, course, lecturer, schedules, semester }) => {
-      schedules.forEach((schedule) => {
-        lines.push([
-          course.code || "",
-          course.name || "",
-          groupOfClass(cls.code),
-          course.credits || "",
-          cls.code || "",
-          formatScheduleTime(schedule),
-          schedule?.room_id?.name || "",
-          lecturer.name || "",
-          schedule ? getScheduleDateRange(semester, cls, schedule) : "",
-        ]);
-      });
-    });
-
-    const csv = lines
-      .map((line) => line.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","))
-      .join("\n");
-    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "thoi-khoa-bieu-hoc-ky.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
-    <Card
-      title="THỜI KHÓA BIỂU DẠNG HỌC KỲ"
-      actions={
-        <div className="row-actions semester-schedule-actions">
-          <Button variant="outline" onClick={() => window.print()}>In</Button>
-          <Button variant="outline" onClick={exportExcel}>Xuất Excel</Button>
-        </div>
-      }
-    >
+    <Card title="THỜI KHÓA BIỂU DẠNG HỌC KỲ">
       <div className="semester-toolbar">
         <Select label="Học kỳ" value={semesterId} onChange={(event) => setSemesterId(event.target.value)}>
           <option value="">Tất cả học kỳ</option>
@@ -246,40 +196,40 @@ export function SemesterSchedulePage({ user }) {
         <table className="semester-table">
           <thead>
             <tr>
-              <th>Mã MH</th>
-              <th>Tên môn học</th>
-              <th>Nhóm tổ</th>
-              <th>Số tín chỉ</th>
-              <th>Lớp</th>
-              <th>Lịch học</th>
-              <th>Phòng</th>
-              <th>Giảng viên</th>
-              <th>Thời gian</th>
+              <th className="sem-col-code">Mã MH</th>
+              <th className="sem-col-name">Tên môn học</th>
+              <th className="sem-col-group">Nhóm tổ</th>
+              <th className="sem-col-credits">Số tín chỉ</th>
+              <th className="sem-col-class">Lớp</th>
+              <th className="sem-col-schedule">Lịch học</th>
+              <th className="sem-col-room">Phòng</th>
+              <th className="sem-col-lecturer">Giảng viên</th>
+              <th className="sem-col-time">Thời gian</th>
             </tr>
           </thead>
           <tbody>
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan="9">Không có dữ liệu thời khóa biểu</td>
+                <td colSpan="9" style={{ textAlign: "center", padding: "24px", color: "#64748b" }}>Không có dữ liệu thời khóa biểu</td>
               </tr>
             )}
             {!loading &&
               rows.map(({ assignment, cls, course, lecturer, schedules, semester }) =>
                 schedules.map((schedule, index) => (
-                  <tr key={`${assignment._id}-${schedule?._id || index}`}>
+                  <tr key={`${assignment._id}-${schedule?._id || index}`} className={index === 0 ? "sem-row-main" : "sem-row-sub"}>
                     {index === 0 && (
                       <>
-                        <td rowSpan={schedules.length}>{course.code || "N/A"}</td>
-                        <td rowSpan={schedules.length}>{course.name || "N/A"}</td>
-                        <td rowSpan={schedules.length}>{groupOfClass(cls.code)}</td>
-                        <td rowSpan={schedules.length}>{course.credits || "N/A"}</td>
-                        <td rowSpan={schedules.length} className="semester-class-cell">{cls.code || "N/A"}</td>
+                        <td rowSpan={schedules.length} className="sem-col-code">{course.code || "N/A"}</td>
+                        <td rowSpan={schedules.length} className="sem-col-name">{course.name || "N/A"}</td>
+                        <td rowSpan={schedules.length} className="sem-col-group">{groupOfClass(cls.code)}</td>
+                        <td rowSpan={schedules.length} className="sem-col-credits">{course.credits || "N/A"}</td>
+                        <td rowSpan={schedules.length} className="sem-col-class">{cls.code || "N/A"}</td>
                       </>
                     )}
-                    <td>{formatScheduleTime(schedule)}</td>
-                    <td>{schedule?.room_id?.name || "N/A"}</td>
-                    <td>{lecturer.name || "N/A"}</td>
-                    <td>{schedule ? getScheduleDateRange(semester, cls, schedule) : "N/A"}</td>
+                    <td className="sem-col-schedule">{formatScheduleTime(schedule)}</td>
+                    <td className="sem-col-room">{schedule?.room_id?.name || "N/A"}</td>
+                    <td className="sem-col-lecturer">{lecturer.name || "N/A"}</td>
+                    <td className="sem-col-time">{schedule ? getScheduleDateRange(semester, cls, schedule) : "N/A"}</td>
                   </tr>
                 )),
               )}

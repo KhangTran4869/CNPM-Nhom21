@@ -32,6 +32,7 @@ export function ProfilePage({ user, onUserChange }) {
     try {
       const nextUser = await authService.updateProfile(form);
       onUserChange(nextUser);
+      alert("Cập nhật thông tin thành công!");
       setMessage("Cập nhật thông tin thành công");
     } catch (err) {
       setError(
@@ -51,7 +52,7 @@ export function ProfilePage({ user, onUserChange }) {
           <div className="profile-avatar">{user?.name?.slice(0, 1)?.toUpperCase() || user?.username?.slice(0, 1)?.toUpperCase()}</div>
           {user?.role !== "HEAD" && <Info label="Mã giảng viên" value={user?.code} />}
           <Info label="Tài khoản" value={user?.username} />
-          <Info label={user?.role === "HEAD" ? "Đơn vị khoa" : "Bộ môn"} value={user?.department || user?.faculty} />
+          <Info label={user?.role === "HEAD" ? "Đơn vị khoa" : "Bộ môn"} value={user?.role === "HEAD" ? user?.faculty || user?.department : user?.department || user?.faculty} />
           <Info label="Vai trò" value={<Badge>{user?.role === "HEAD" ? "Trưởng khoa" : user?.role}</Badge>} />
           <Info label="Trạng thái tài khoản" value={<Badge>{user?.status}</Badge>} />
           {user?.role !== "HEAD" && <Info label="Định mức giờ" value={user?.max_hours} />}

@@ -1,22 +1,42 @@
 import Assignment from "../models/Assignment.js";
 import Lecturer from "../models/Lecturer.js";
 import Class from "../models/Class.js";
+import Semester from "../models/Semester.js";
 import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
 import { normalizeCode } from "../utils/constants.js";
 import { getCurrentHours } from "../services/conflictService.js";
 
 export const lecturerWorkloads = asyncHandler(async (req, res) => {
   const { semester_id, department_id } = req.query;
-  if (!semester_id) return errorResponse(res, "Dữ liệu không hợp lệ", ["SEMESTER_REQUIRED"], 400);
+  const isAllSem = !semester_id || semester_id === "all";
+  const semDoc = !isAllSem ? await Semester.findById(semester_id).catch(() => null) : null;
+  const semName = semDoc ? semDoc.name : "Tất cả học kỳ";
+
   const filter = { is_deleted: false };
   if (department_id) filter.department_id = department_id;
-  const lecturers = await Lecturer.find(filter).populate("department_id");
+  if (req.userRole === "HEAD" && req.userFaculty) {
+    filter.faculty = req.userFaculty;
+  }
+  const allLecturers = await Lecturer.find(filter)
+    .populate("department_id")
+    .populate({ path: "user_id", populate: { path: "role_id" } });
+
+  const validLecturers = allLecturers.filter((item) => {
+    const roleCode = item.user_id?.role_id?.code || item.user_id?.role;
+    if (roleCode === "HEAD" || roleCode === "ADMIN") return false;
+    const codeStr = (item.code || "").toUpperCase();
+    const nameStr = (item.name || "").toUpperCase();
+    if (codeStr.includes("TRUONGKHOA") || codeStr.includes("ADMIN")) return false;
+    if (nameStr.includes("TRƯỞNG KHOA") || nameStr === "ADMIN") return false;
+    return true;
+  });
+
   const data = [];
-  for (const lecturer of lecturers) {
-    const totalHours = await getCurrentHours(lecturer._id, semester_id, null, true);
-    const maxHours = Number(lecturer.max_hours || 0);
-    let status = "Đủ tải";
-    if (totalHours < maxHours) status = "Thiếu giờ";
+  for (const lecturer of validLecturers) {
+    const totalHours = await getCurrentHours(lecturer._id, isAllSem ? null : semester_id, null, true);
+    const maxHours = Number(lecturer.max_hours || 180);
+    let status = "Đủ giờ";
+    if (totalHours < 45) status = "Thiếu giờ";
     else if (totalHours > maxHours) status = "Vượt tải";
 
     data.push({
@@ -24,6 +44,8 @@ export const lecturerWorkloads = asyncHandler(async (req, res) => {
       code: lecturer.code,
       name: lecturer.name,
       department: lecturer.department_id?.name || null,
+      faculty: lecturer.faculty || "Khoa Công nghệ thông tin",
+      semester_name: semName,
       total_hours: totalHours,
       max_hours: maxHours,
       remaining_hours: maxHours - totalHours,
@@ -35,7 +57,7 @@ export const lecturerWorkloads = asyncHandler(async (req, res) => {
 
 export const assignmentReport = asyncHandler(async (req, res) => {
   const { semester_id, status, department_id } = req.query;
-  if (!semester_id) return errorResponse(res, "Dữ liệu không hợp lệ", ["SEMESTER_REQUIRED"], 400);
+  const isAllSem = !semester_id || semester_id === "all";
   const filter = { is_deleted: false };
   if (status) filter.status = normalizeCode(status);
   const assignments = await Assignment.find(filter)
@@ -45,7 +67,7 @@ export const assignmentReport = asyncHandler(async (req, res) => {
     })
     .populate({ path: "lecturer_id", populate: "department_id" })
     .sort({ createdAt: "desc" });
-  let data = assignments.filter(
+  let data = isAllSem ? assignments : assignments.filter(
     (item) => String(item.class_id?.semester_id?._id || item.class_id?.semester_id) === String(semester_id),
   );
   if (department_id) {
@@ -57,12 +79,18 @@ export const assignmentReport = asyncHandler(async (req, res) => {
           String(department_id),
     );
   }
+  if (req.userRole === "HEAD" && req.userFaculty) {
+    data = data.filter((item) => {
+      const classFac = item.class_id?.course_id?.department_id?.description;
+      const lecFac = item.lecturer_id?.faculty || item.lecturer_id?.department_id?.description;
+      return classFac === req.userFaculty || lecFac === req.userFaculty;
+    });
+  }
   return successResponse(res, data);
 });
 
 export const exportAssignments = asyncHandler(async (req, res) => {
-  const { semester_id, format = "excel" } = req.query;
-  if (!semester_id) return errorResponse(res, "Dữ liệu không hợp lệ", ["SEMESTER_REQUIRED"], 400);
+  const { semester_id = "all", format = "excel" } = req.query;
   const extension = format === "pdf" ? "pdf" : "xlsx";
   return successResponse(res, {
     download_url: `/downloads/reports/assignments-${semester_id}.${extension}`,
@@ -72,12 +100,16 @@ export const exportAssignments = asyncHandler(async (req, res) => {
 // CHÈN VÀO ĐÂY: API thống kê 4 thẻ Cards tổng quan và Xuất Excel khối lượng giảng dạy
 export const assignmentSummary = asyncHandler(async (req, res) => {
   const { semester_id, department_id } = req.query;
-  if (!semester_id) return errorResponse(res, "Dữ liệu không hợp lệ", ["SEMESTER_REQUIRED"], 400);
+  const isAllSem = !semester_id || semester_id === "all";
 
-  const classFilter = { is_deleted: false, semester_id };
-  let classes = await Class.find(classFilter).populate("course_id");
+  const classFilter = { is_deleted: false };
+  if (!isAllSem) classFilter.semester_id = semester_id;
+  let classes = await Class.find(classFilter).populate({ path: "course_id", populate: "department_id" });
   if (department_id) {
-    classes = classes.filter(cls => String(cls.course_id?.department_id) === String(department_id));
+    classes = classes.filter(cls => String(cls.course_id?.department_id?._id || cls.course_id?.department_id) === String(department_id));
+  }
+  if (req.userRole === "HEAD" && req.userFaculty) {
+    classes = classes.filter(cls => cls.course_id?.department_id?.description === req.userFaculty);
   }
 
   const totalClasses = classes.length;
@@ -110,8 +142,7 @@ export const assignmentSummary = asyncHandler(async (req, res) => {
 });
 
 export const exportWorkloads = asyncHandler(async (req, res) => {
-  const { semester_id, format = "excel" } = req.query;
-  if (!semester_id) return errorResponse(res, "Dữ liệu không hợp lệ", ["SEMESTER_REQUIRED"], 400);
+  const { semester_id = "all", format = "excel" } = req.query;
   const extension = format === "pdf" ? "pdf" : "xlsx";
   return successResponse(res, {
     download_url: `/downloads/reports/workloads-${semester_id}.${extension}`,

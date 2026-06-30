@@ -21,7 +21,7 @@ export function HeadHome({ user, onUserChange }) {
           <InfoCell label="Họ và tên" value={user?.name || user?.username} />
           <InfoCell label="Tài khoản hệ thống" value={user?.username} />
           <InfoCell label="Vai trò nghiệp vụ" value={<Badge>Trưởng khoa</Badge>} />
-          <InfoCell label="Đơn vị khoa" value={user?.department || user?.faculty} />
+          <InfoCell label="Đơn vị khoa" value={user?.faculty || user?.department} />
           <InfoCell label="Học hàm / Học vị" value={user?.degree} />
           <InfoCell label="Số điện thoại" value={user?.phone} />
           <InfoCell label="Email liên hệ" value={user?.email} />
@@ -38,7 +38,7 @@ export function HeadHome({ user, onUserChange }) {
           <p style={{ margin: "0 0 10px 0" }}><strong>Quyền hạn quản lý Trưởng khoa:</strong></p>
           <ul style={{ paddingLeft: "20px", margin: 0 }}>
             <li style={{ marginBottom: "8px" }}>Quản lý toàn bộ các bộ môn, danh sách giảng viên trực thuộc và lớp tín chỉ trong Khoa.</li>
-            <li style={{ marginBottom: "8px" }}>Thực hiện và phê duyệt <strong>Phân công giảng viên</strong> vào các lớp tín chỉ thuộc Khoa phụ trách.</li>
+            <li style={{ marginBottom: "8px" }}>Thực hiện đề xuất <strong>Phân công giảng viên</strong> vào các lớp tín chỉ thuộc Khoa phụ trách để gửi lên Ban Quản trị phê duyệt.</li>
             <li>Tự động rà soát xung đột lịch giảng dạy, theo dõi khối lượng giảng dạy và báo cáo thống kê toàn Khoa.</li>
           </ul>
         </div>

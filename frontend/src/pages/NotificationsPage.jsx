@@ -92,11 +92,10 @@ export function NotificationsPage({ user }) {
   return (
     <div className="page-stack">
       <Card
-        title="📢 Thông báo từ ban quản trị"
+        title="Thông báo từ ban quản trị"
         actions={
           <div className="row-actions">
             {isAdmin && <Button onClick={() => setModalOpen(true)}>+ Thêm thông báo</Button>}
-            {isAdmin && <Button variant="outline" onClick={resetDefault}>Khôi phục mẫu</Button>}
           </div>
         }
       >

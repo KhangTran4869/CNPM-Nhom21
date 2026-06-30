@@ -14,10 +14,15 @@ export const getAllClasses = asyncHandler(async (req, res) => {
   if (req.query.course_id) filter.course_id = req.query.course_id;
   if (req.query.status) filter.status = normalizeCode(req.query.status);
   if (req.query.keyword) filter.code = { $regex: req.query.keyword, $options: "i" };
-  const classes = await Class.find(filter)
-    .populate("course_id semester_id")
+  let classes = await Class.find(filter)
+    .populate({ path: "course_id", populate: { path: "department_id" } })
+    .populate("semester_id")
     .sort({ createdAt: "desc" })
     .lean();
+
+  if (req.userRole === "HEAD" && req.userFaculty) {
+    classes = classes.filter((c) => c.course_id?.department_id?.description === req.userFaculty);
+  }
 
   const classIds = classes.map((c) => c._id);
   const [assignments, schedules] = await Promise.all([
@@ -67,9 +72,9 @@ export const createClass = asyncHandler(async (req, res) => {
   const semester = await Semester.findOne({ _id: semester_id, is_deleted: false });
   if (!semester) {
     errors.push("SEMESTER_NOT_FOUND");
-  } else if (!["PLANNING", "UPCOMING"].includes(semester.status)) {
-    const statusLabels = { ACTIVE: "Đang diễn ra", COMPLETED: "Đã kết thúc", LOCKED: "Đã khóa" };
-    return errorResponse(res, `Không thể tạo lớp tín chỉ cho học kỳ "${semester.name}" đang ở trạng thái "${statusLabels[semester.status] || semester.status}". Chỉ cho phép tạo lớp khi học kỳ đang ở trạng thái "Đang lập kế hoạch" hoặc "Chưa mở".`, ["SEMESTER_STATUS_RESTRICTED"], 403);
+  } else if (semester.status !== "ACTIVE") {
+    const statusLabels = { UPCOMING: "Chưa mở", COMPLETED: "Đã kết thúc" };
+    return errorResponse(res, `Không thể tạo lớp tín chỉ cho học kỳ "${semester.name}" đang ở trạng thái "${statusLabels[semester.status] || semester.status}". Chỉ cho phép tạo lớp khi học kỳ ở trạng thái "Đang diễn ra".`, ["SEMESTER_STATUS_RESTRICTED"], 403);
   }
 
   if (max_students !== undefined && max_students !== null && (isNaN(max_students) || Number(max_students) < 25)) {

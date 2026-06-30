@@ -37,6 +37,7 @@ export function EditProfileModal({ user, onClose, onUserChange }) {
       if (onUserChange) {
         onUserChange(nextUser);
       }
+      alert("Cập nhật thông tin thành công!");
       onClose();
     } catch (err) {
       setError(

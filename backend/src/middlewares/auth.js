@@ -29,7 +29,7 @@ export const authenticate = async (req, res, next) => {
       is_deleted: false,
     });
 
-    if (!lecturer && req.userRole === "LECTURER") {
+    if (!lecturer && (req.userRole === "LECTURER" || req.userRole === "HEAD")) {
       lecturer = await Lecturer.findOne({
         $or: [
           { code: user.username.toUpperCase() },
@@ -39,6 +39,7 @@ export const authenticate = async (req, res, next) => {
       });
       if (lecturer && !lecturer.user_id) {
         lecturer.user_id = user._id;
+        if (user.faculty) lecturer.faculty = user.faculty;
         await lecturer.save();
       } else if (!lecturer) {
         lecturer = await Lecturer.create({
@@ -47,12 +48,14 @@ export const authenticate = async (req, res, next) => {
           name: user.username,
           email: user.email || "",
           phone: "",
-          degree: "",
+          degree: req.userRole === "HEAD" ? "Tiến sĩ" : "Thạc sĩ",
+          faculty: user.faculty || "Khoa Công nghệ thông tin",
           taught_hours: 0,
         });
       }
     }
     req.lecturer = lecturer;
+    req.userFaculty = user.faculty || lecturer?.faculty || null;
     next();
   } catch (error) {
     return errorResponse(res, "Chưa đăng nhập", [error.message], 401);

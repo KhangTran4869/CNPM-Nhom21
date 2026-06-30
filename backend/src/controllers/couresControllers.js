@@ -1,9 +1,12 @@
 import Course from "../models/Course.js";
 import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
 
-export const getAllCourses = asyncHandler(async (_req, res) => {
+export const getAllCourses = asyncHandler(async (req, res) => {
   await Course.updateMany({ credits: { $lte: 0 }, is_deleted: false }, { credits: 3 });
-  const courses = await Course.find({ is_deleted: false }).populate("department_id").sort({ createdAt: "desc" });
+  let courses = await Course.find({ is_deleted: false }).populate("department_id").sort({ createdAt: "desc" });
+  if (req.userRole === "HEAD" && req.userFaculty) {
+    courses = courses.filter((c) => c.department_id?.description === req.userFaculty);
+  }
   return successResponse(res, courses);
 });
 

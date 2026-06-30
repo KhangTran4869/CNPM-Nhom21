@@ -1,8 +1,12 @@
 import Department from "../models/Department.js";
 import { asyncHandler, errorResponse, successResponse } from "../utils/apiResponse.js";
 
-export const getAllDepartments = asyncHandler(async (_req, res) => {
-  const departments = await Department.find({ is_deleted: false }).sort({ createdAt: "desc" });
+export const getAllDepartments = asyncHandler(async (req, res) => {
+  const filter = { is_deleted: false };
+  if (req.userRole === "HEAD" && req.userFaculty) {
+    filter.description = req.userFaculty;
+  }
+  const departments = await Department.find(filter).sort({ createdAt: "desc" });
   return successResponse(res, departments);
 });
 

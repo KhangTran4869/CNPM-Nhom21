@@ -528,21 +528,25 @@ textarea.uis-input {
 .semester-table th {
   color: #0369a1;
   background: #f0f9ff;
-  border-bottom: 2px solid #bae6fd;
+  border: 1px solid #bae6fd;
   padding: 14px 16px;
-  text-align: left;
+  text-align: center;
   font-weight: 700;
   white-space: nowrap;
 }
 
 .semester-table td {
-  border-bottom: 1px solid #e0f2fe;
+  border: 1px solid #e0f2fe;
   padding: 14px 16px;
   color: #1e293b;
   vertical-align: middle;
 }
 
-.semester-table tbody tr:nth-child(even) {
+.semester-table tbody tr.sem-row-main {
+  background-color: #ffffff;
+}
+
+.semester-table tbody tr.sem-row-sub {
   background-color: #f8fafc;
 }
 
@@ -551,25 +555,15 @@ textarea.uis-input {
   transition: background-color 0.15s ease;
 }
 
-.semester-table tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.semester-table th:nth-child(1), .semester-table td:nth-child(1) { text-align: center; white-space: nowrap; font-weight: 600; color: #475569; }
-.semester-table th:nth-child(2), .semester-table td:nth-child(2) { text-align: left; font-weight: 600; color: #0f172a; min-width: 180px; }
-.semester-table th:nth-child(3), .semester-table td:nth-child(3) { text-align: center; white-space: nowrap; }
-.semester-table th:nth-child(4), .semester-table td:nth-child(4) { text-align: center; white-space: nowrap; }
-.semester-table th:nth-child(5), .semester-table td:nth-child(5) { text-align: center; white-space: nowrap; font-weight: 600; }
-.semester-table th:nth-child(6), .semester-table td:nth-child(6) { text-align: center; white-space: nowrap; font-weight: 700; color: #0284c7; }
-.semester-table th:nth-child(7), .semester-table td:nth-child(7) { text-align: center; white-space: nowrap; font-weight: 600; }
-.semester-table th:nth-child(8), .semester-table td:nth-child(8) { text-align: left; min-width: 140px; }
-.semester-table th:nth-child(9), .semester-table td:nth-child(9) { text-align: center; white-space: nowrap; font-size: 13px; color: #64748b; }
-
-.semester-class-cell {
-  text-align: center;
-  line-height: 1.35;
-  word-break: break-word;
-}
+.semester-table .sem-col-code { text-align: center; white-space: nowrap; font-weight: 600; color: #475569; }
+.semester-table .sem-col-name { text-align: left; font-weight: 600; color: #0f172a; min-width: 180px; }
+.semester-table .sem-col-group { text-align: center; white-space: nowrap; }
+.semester-table .sem-col-credits { text-align: center; white-space: nowrap; }
+.semester-table .sem-col-class { text-align: center; white-space: nowrap; font-weight: 600; color: #1e293b; }
+.semester-table .sem-col-schedule { text-align: center; white-space: nowrap; font-weight: 700; color: #0284c7; }
+.semester-table .sem-col-room { text-align: center; white-space: nowrap; font-weight: 600; }
+.semester-table .sem-col-lecturer { text-align: left; min-width: 140px; font-weight: 500; }
+.semester-table .sem-col-time { text-align: center; white-space: nowrap; font-size: 13px; color: #64748b; }
 
 .modal-backdrop {
   position: fixed;

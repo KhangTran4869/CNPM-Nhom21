@@ -40,31 +40,7 @@ export function AvailabilityPage({ user }) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [preferences, setPreferences] = useState(user?.preferences || "");
-  const [prefSaving, setPrefSaving] = useState(false);
-  const [prefMsg, setPrefMsg] = useState("");
-
   const isAdmin = user?.role === "ADMIN";
-
-  useEffect(() => {
-    if (user?.preferences !== undefined) {
-      setPreferences(user.preferences || "");
-    }
-  }, [user]);
-
-  const savePreferences = async (e) => {
-    e.preventDefault();
-    setPrefSaving(true);
-    setPrefMsg("");
-    try {
-      await authService.updateProfile({ preferences });
-      setPrefMsg("Đã cập nhật nguyện vọng giảng dạy thành công!");
-    } catch {
-      setPrefMsg("Lỗi khi lưu nguyện vọng");
-    } finally {
-      setPrefSaving(false);
-    }
-  };
 
   useEffect(() => {
     lecturerService.getLecturers().then((data) => {
@@ -154,8 +130,8 @@ export function AvailabilityPage({ user }) {
       key: "session",
       title: "Buổi học",
       render: (row) => {
-        if (row.end_period <= 6) return <span style={{ color: "#0284c7" }}>☀️ Buổi sáng</span>;
-        if (row.start_period >= 7) return <span style={{ color: "#d97706" }}>🌅 Buổi chiều</span>;
+        if (row.end_period <= 6) return <span style={{ color: "#0284c7" }}>Buổi sáng</span>;
+        if (row.start_period >= 7) return <span style={{ color: "#d97706" }}>Buổi chiều</span>;
         return <span>Cả ngày</span>;
       },
     },
@@ -164,7 +140,7 @@ export function AvailabilityPage({ user }) {
       title: "Phân loại lịch",
       render: (row) => (
         <Badge type={row.status === "BUSY" ? "danger" : "success"}>
-          {row.status === "BUSY" ? "🔴 Bận (Không xếp lịch)" : "🟢 Rảnh (Mong muốn dạy)"}
+          {row.status === "BUSY" ? "Bận (Không xếp lịch)" : "Rảnh (Mong muốn dạy)"}
         </Badge>
       ),
     },
@@ -181,38 +157,10 @@ export function AvailabilityPage({ user }) {
 
   return (
     <div className="page-stack" style={{ display: "grid", gap: "20px" }}>
-      {!isAdmin && (
-        <Card title="📝 Khai báo nguyện vọng giảng dạy trong học kỳ">
-          {prefMsg && (
-            <div className={`alert ${prefMsg.includes("Lỗi") ? "danger" : "success"}`} style={{ marginBottom: "12px", background: prefMsg.includes("Lỗi") ? "#fee2e2" : "#d1fae5", color: prefMsg.includes("Lỗi") ? "#991b1b" : "#065f46", padding: "10px", borderRadius: "6px" }}>
-              {prefMsg}
-            </div>
-          )}
-          <form onSubmit={savePreferences} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontWeight: "600", color: "#334155" }}>
-              <span>Nguyện vọng giảng dạy môn học / khung giờ / đối tượng sinh viên:</span>
-              <textarea
-                className="uis-input"
-                rows={3}
-                value={preferences}
-                onChange={(e) => setPreferences(e.target.value)}
-                placeholder="VD: Mong muốn được phân công dạy môn Cơ sở dữ liệu buổi sáng, không bố trí lớp vào chiều thứ 6 do họp bộ môn..."
-                style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
-              />
-            </label>
-            <div>
-              <Button type="submit" variant="primary" disabled={prefSaving}>
-                {prefSaving ? "Đang lưu..." : "💾 Lưu nguyện vọng"}
-              </Button>
-            </div>
-          </form>
-        </Card>
-      )}
-
-      <Card title="🗓️ Khai báo lịch bận giảng dạy">
+      <Card title="Khai báo lịch bận giảng dạy">
         <div style={{ padding: "12px 16px", background: "#f8fafc", borderLeft: "4px solid var(--primary-color)", borderRadius: "6px", marginBottom: "16px", fontSize: "0.95rem", lineHeight: "1.5" }}>
           <p style={{ margin: 0 }}>
-            💡 <strong>Quy định xếp lịch:</strong> Giảng viên chỉ cần khai báo các khung giờ <strong>Bận</strong> (công tác, học tập, việc riêng). Nếu không khai báo bận, hệ thống sẽ tự động coi là <strong>Rảnh</strong> để thuận tiện cho việc xếp lịch tự động!
+            <strong>Quy định xếp lịch:</strong> Giảng viên chỉ cần khai báo các khung giờ <strong>Bận</strong> (công tác, học tập, việc riêng). Nếu không khai báo bận, hệ thống sẽ tự động coi là <strong>Rảnh</strong> để thuận tiện cho việc xếp lịch tự động!
           </p>
         </div>
 
@@ -264,16 +212,16 @@ export function AvailabilityPage({ user }) {
             onChange={(e) => setForm({ ...form, status: e.target.value })}
             disabled
           >
-            <option value="BUSY">🔴 Bận (Không xếp lịch)</option>
+            <option value="BUSY">Bận (Không xếp lịch)</option>
           </Select>
 
           <Button type="submit" variant="primary" style={{ height: "42px", fontWeight: "600" }}>
-            ➕ Đăng ký lịch
+            Đăng ký lịch
           </Button>
         </form>
       </Card>
 
-      <Card title="📋 Danh sách các khung giờ đã khai báo">
+      <Card title="Danh sách các khung giờ đã khai báo">
         <Table columns={columns} rows={items} loading={loading} />
       </Card>
     </div>

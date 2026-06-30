@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import * as XLSX from "xlsx";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -34,7 +35,7 @@ export function ReportsPage({ user }) {
   useEffect(() => {
     catalogService.getSemesters().then((data) => {
       setSemesters(data);
-      setSemesterId(data[0]?._id || "");
+      setSemesterId("all");
     }).catch(() => setSemesters([]));
   }, []);
 
@@ -45,8 +46,6 @@ export function ReportsPage({ user }) {
   }, [isLecturer, tab]);
 
   useEffect(() => {
-    if (!semesterId) return;
-
     const load = async () => {
       setLoading(true);
       setError("");
@@ -67,7 +66,7 @@ export function ReportsPage({ user }) {
           }
 
           const [workload, schedule] = await Promise.all([
-            lecturerService.getLecturerWorkload(lid, { semester_id: semesterId }).catch(() => ({ total_hours: 0, max_hours: 120, status: "NORMAL" })),
+            lecturerService.getLecturerWorkload(lid, { semester_id: semesterId }).catch(() => ({ total_hours: 0, max_hours: 180, status: "NORMAL" })),
             lecturerService.getTeachingSchedule(lid, { semester_id: semesterId }).catch(() => [])
           ]);
 
@@ -81,11 +80,18 @@ export function ReportsPage({ user }) {
             reportService.getAssignmentReport({ semester_id: semesterId }),
             reportService.getAssignmentSummary({ semester_id: semesterId }).catch(() => null)
           ]);
-          setRows(data);
+          setRows(data || []);
           setSummary(sumData);
         } else {
           const data = await reportService.getLecturerWorkloads({ semester_id: semesterId });
-          setRows(data);
+          const filteredData = (data || []).filter(item => {
+            const codeStr = (item.code || "").toUpperCase();
+            const nameStr = (item.name || "").toUpperCase();
+            if (codeStr.includes("TRUONGKHOA") || codeStr.includes("ADMIN") || nameStr.includes("TRƯỞNG KHOA") || nameStr === "ADMIN") return false;
+            if (user?.role === "HEAD" && user?.faculty && item.faculty && item.faculty !== user.faculty) return false;
+            return true;
+          });
+          setRows(filteredData);
           setSummary(null);
         }
       } catch (err) {
@@ -100,18 +106,72 @@ export function ReportsPage({ user }) {
     load();
   }, [isLecturer, semesterId, tab, user]);
 
-  const exportReport = async (format) => {
+  const exportReport = () => {
     setError("");
     try {
-      const data = tab === "assignments"
-        ? await reportService.exportAssignmentReport({ semester_id: semesterId, format })
-        : await reportService.exportLecturerWorkloads({ semester_id: semesterId, format });
-      alert(data.download_url);
+      if (!Array.isArray(rows) || rows.length === 0) {
+        alert("Không có dữ liệu để xuất Excel");
+        return;
+      }
+      let headers = [];
+      let data = [];
+      let fileName = "";
+
+      if (isLecturer) {
+        headers = ["Mã lớp tín chỉ", "Tên môn học", "Số tín chỉ", "Khối lượng giờ", "Trạng thái"];
+        data = rows.map(row => [
+          row.class_id?.code || "N/A",
+          row.class_id?.course_id?.name || "N/A",
+          row.class_id?.course_id?.credits || 3,
+          row.class_id?.course_id?.total_hours || (row.class_id?.course_id?.credits || 3) * 15,
+          row.status === "APPROVED" ? "Đã duyệt" : row.status === "PROPOSED" ? "Đề xuất" : row.status
+        ]);
+        fileName = "Khoi_luong_giang_day_cua_toi.xlsx";
+      } else if (tab === "assignments") {
+        headers = ["Mã lớp", "Môn học", "Mã GV", "Tên GV", "Học kỳ", "Trạng thái"];
+        data = rows.map(row => [
+          row.class_id?.code || "N/A",
+          row.class_id?.course_id?.name || "N/A",
+          row.lecturer_id?.code || "N/A",
+          row.lecturer_id?.name || "N/A",
+          row.class_id?.semester_id?.name || "N/A",
+          row.status || "N/A"
+        ]);
+        fileName = "Danh_sach_phan_cong.xlsx";
+      } else {
+        headers = ["Mã GV", "Họ tên", "Bộ môn", "Học kỳ", "Khối lượng (giờ)", "Số giờ tối đa", "Trạng thái"];
+        data = rows.map(row => [
+          row.code || "N/A",
+          row.name || "N/A",
+          row.department || "N/A",
+          row.semester_name || semesters.find(s => String(s._id) === String(semesterId))?.name || "Tất cả học kỳ",
+          row.total_hours || 0,
+          row.max_hours || 180,
+          row.status || "N/A"
+        ]);
+        fileName = "Bao_cao_khoi_luong_giang_day.xlsx";
+      }
+
+      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
+      worksheet["!cols"] = headers.map((h, idx) => ({
+        wch: Math.max(h.length, ...data.map(r => String(r[idx] || "").length)) + 5
+      }));
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Báo cáo");
+      XLSX.writeFile(workbook, fileName);
     } catch (err) {
-      console.error("Không thể xuất báo cáo", err);
-      setError(getErrorMessage(err));
+      console.error("Không thể xuất Excel", err);
+      setError("Có lỗi xảy ra khi tạo file Excel");
     }
   };
+
+  const workloadsSummary = tab === "workloads" && Array.isArray(rows) ? {
+    total: rows.length,
+    thieu: rows.filter(r => r.status === "Thiếu giờ").length,
+    du: rows.filter(r => r.status === "Đủ giờ" || r.status === "Đủ tải").length,
+    vuot: rows.filter(r => r.status === "Vượt tải").length
+  } : null;
 
   const columns = isLecturer
     ? [
@@ -137,6 +197,7 @@ export function ReportsPage({ user }) {
         { key: "code", title: "Mã GV" },
         { key: "name", title: "Họ tên" },
         { key: "department", title: "Bộ môn" },
+        { key: "semester", title: "Học kỳ", render: (row) => <Badge variant="outline">{row.semester_name || semesters.find(s => String(s._id) === String(semesterId))?.name || "Tất cả học kỳ"}</Badge> },
         { key: "total_hours", title: "Khối lượng (giờ)" },
         { key: "max_hours", title: "Số giờ tối đa" },
         { key: "status", title: "Trạng thái", render: (row) => {
@@ -150,24 +211,24 @@ export function ReportsPage({ user }) {
       title={isLecturer ? "Khối lượng giảng dạy của tôi" : "Báo cáo thống kê"}
       actions={!isLecturer && isAdmin && (
         <div className="row-actions">
-          <Button variant="outline" onClick={() => exportReport("excel")}>Xuất Excel</Button>
-          <Button variant="outline" onClick={() => exportReport("pdf")}>Xuất PDF</Button>
+          <Button variant="primary" onClick={exportReport} style={{ background: "#10b981", borderColor: "#059669", color: "white", fontWeight: 600 }}>Xuất Excel (.xlsx)</Button>
         </div>
       )}
     >
       {!isLecturer && (
-        <div className="tabs">
-          <Button variant={tab === "assignments" ? "primary" : "outline"} onClick={() => setTab("assignments")}>Danh sách phân công</Button>
-          <Button variant={tab === "workloads" ? "primary" : "outline"} onClick={() => setTab("workloads")}>Khối lượng giảng dạy</Button>
+        <div style={{ display: "flex", gap: "12px", marginBottom: "20px", borderBottom: "2px solid #e2e8f0", paddingBottom: "12px" }}>
+          <Button variant={tab === "assignments" ? "primary" : "outline"} onClick={() => setTab("assignments")} style={{ fontWeight: tab === "assignments" ? "600" : "400" }}>Danh sách phân công</Button>
+          <Button variant={tab === "workloads" ? "primary" : "outline"} onClick={() => setTab("workloads")} style={{ fontWeight: tab === "workloads" ? "600" : "400" }}>Khối lượng giảng dạy</Button>
         </div>
       )}
       <div className="filter-row">
         <Select label="Học kỳ" value={semesterId} onChange={(e) => setSemesterId(e.target.value)}>
+          <option value="all">Tất cả học kỳ</option>
           {semesters.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
         </Select>
       </div>
 
-      {/* CHÈN VÀO ĐÂY: 4 Thẻ (Cards) thống kê tổng quan ở trên cùng cho tab Danh sách phân công */}
+      {/* 4 Thẻ (Cards) thống kê tổng quan ở trên cùng cho tab Danh sách phân công */}
       {!isLecturer && tab === "assignments" && summary && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "16px", margin: "16px 0 24px 0" }}>
           <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "10px", border: "1px solid #e2e8f0", textAlign: "center" }}>
@@ -189,11 +250,33 @@ export function ReportsPage({ user }) {
         </div>
       )}
 
+      {/* 4 Thẻ (Cards) thống kê tổng quan ở trên cùng cho tab Khối lượng giảng dạy */}
+      {!isLecturer && tab === "workloads" && workloadsSummary && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "16px", margin: "16px 0 24px 0" }}>
+          <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "10px", border: "1px solid #e2e8f0", textAlign: "center" }}>
+            <div style={{ fontSize: "0.85rem", color: "#64748b", marginBottom: "4px" }}>Tổng số giảng viên</div>
+            <div style={{ fontSize: "1.6rem", fontWeight: "bold", color: "#0f172a" }}>{workloadsSummary.total}</div>
+          </div>
+          <div style={{ background: "#fef2f2", padding: "16px", borderRadius: "10px", border: "1px solid #fecaca", textAlign: "center" }}>
+            <div style={{ fontSize: "0.85rem", color: "#b91c1c", marginBottom: "4px" }}>Thiếu giờ chuẩn</div>
+            <div style={{ fontSize: "1.6rem", fontWeight: "bold", color: "#dc2626" }}>{workloadsSummary.thieu}</div>
+          </div>
+          <div style={{ background: "#ecfdf5", padding: "16px", borderRadius: "10px", border: "1px solid #a7f3d0", textAlign: "center" }}>
+            <div style={{ fontSize: "0.85rem", color: "#047857", marginBottom: "4px" }}>Đủ giờ tối thiểu</div>
+            <div style={{ fontSize: "1.6rem", fontWeight: "bold", color: "#059669" }}>{workloadsSummary.du}</div>
+          </div>
+          <div style={{ background: "#fffbeb", padding: "16px", borderRadius: "10px", border: "1px solid #fde68a", textAlign: "center" }}>
+            <div style={{ fontSize: "0.85rem", color: "#b45309", marginBottom: "4px" }}>Vượt định mức</div>
+            <div style={{ fontSize: "1.6rem", fontWeight: "bold", color: "#d97706" }}>{workloadsSummary.vuot}</div>
+          </div>
+        </div>
+      )}
+
       {isLecturer && lecturerStats && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", margin: "8px 0 24px 0" }}>
           <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "10px", border: "1px solid #e2e8f0", textAlign: "center" }}>
             <div style={{ fontSize: "0.85rem", color: "#64748b", marginBottom: "4px" }}>Số giờ dạy tối đa</div>
-            <div style={{ fontSize: "1.5rem", fontWeight: "bold", color: "#0f172a" }}>{lecturerStats.max_hours || 120} <span style={{ fontSize: "1rem", fontWeight: "normal" }}>giờ chuẩn</span></div>
+            <div style={{ fontSize: "1.5rem", fontWeight: "bold", color: "#0f172a" }}>{lecturerStats.max_hours || 180} <span style={{ fontSize: "1rem", fontWeight: "normal" }}>giờ chuẩn</span></div>
           </div>
           <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "10px", border: "1px solid #e2e8f0", textAlign: "center" }}>
             <div style={{ fontSize: "0.85rem", color: "#64748b", marginBottom: "4px" }}>Thực tế phân công</div>

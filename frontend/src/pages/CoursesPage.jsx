@@ -83,7 +83,7 @@ export function CoursesPage() {
     { key: "code", title: "Mã môn" },
     { key: "name", title: "Tên môn" },
     { key: "credits", title: "Số tín chỉ" },
-    { key: "department", title: "Bộ môn", render: (row) => row.department_id?.name || "N/A" },
+    { key: "department", title: "Bộ môn & Khoa", render: (row) => row.department_id ? `${row.department_id.name}${row.department_id.description ? ` (${row.department_id.description})` : ""}` : "N/A" },
     {
       key: "actions",
       title: "Hành động",
@@ -122,7 +122,7 @@ export function CoursesPage() {
           <Select label="Bộ môn" value={form.department_id} onChange={(event) => setForm({ ...form, department_id: event.target.value })}>
             <option value="">Chọn bộ môn</option>
             {departments.map((department) => (
-              <option key={department._id} value={department._id}>{department.name}</option>
+              <option key={department._id} value={department._id}>{department.name}{department.description ? ` (${department.description})` : ""}</option>
             ))}
           </Select>
           {error && <div className="alert danger">{error}</div>}

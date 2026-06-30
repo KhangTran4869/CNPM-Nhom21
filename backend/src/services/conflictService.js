@@ -275,7 +275,10 @@ export const checkAssignmentEligibility = async ({
 };
 
 export const getSuggestedLecturers = async (classId) => {
-  const classDoc = await Class.findOne({ _id: classId, is_deleted: false }).populate("course_id");
+  const classDoc = await Class.findOne({ _id: classId, is_deleted: false }).populate({
+    path: "course_id",
+    populate: { path: "department_id" }
+  });
   if (!classDoc) return null;
   const existingAssignment = await Assignment.findOne({
     class_id: classDoc._id,
@@ -283,12 +286,23 @@ export const getSuggestedLecturers = async (classId) => {
     is_deleted: false,
   });
 
-  const filter = { status: "ACTIVE", is_deleted: false };
-  if (classDoc.course_id?.department_id) {
-    filter.department_id = classDoc.course_id.department_id;
-  }
+  const deptId = classDoc.course_id?.department_id?._id || classDoc.course_id?.department_id;
+  const courseFaculty = classDoc.course_id?.department_id?.description || "Khoa Công nghệ thông tin";
 
-  const lecturers = await Lecturer.find(filter).populate("department_id");
+  const allLecs = await Lecturer.find({ status: "ACTIVE", is_deleted: false })
+    .populate("department_id")
+    .populate({ path: "user_id", populate: { path: "role_id" } });
+  const lecturers = allLecs.filter((l) => {
+    const roleCode = l.user_id?.role_id?.code || l.user_id?.role;
+    if (roleCode === "HEAD" || roleCode === "ADMIN") return false;
+    const codeStr = (l.code || "").toUpperCase();
+    const nameStr = (l.name || "").toUpperCase();
+    if (codeStr.includes("TRUONGKHOA") || codeStr.includes("ADMIN")) return false;
+    if (nameStr.includes("TRƯỞNG KHOA") || nameStr === "ADMIN") return false;
+    const lFac = l.faculty || l.department_id?.description || "Khoa Công nghệ thông tin";
+    return lFac === courseFaculty;
+  });
+
   const suggestions = [];
 
   for (const lecturer of lecturers) {
@@ -302,7 +316,8 @@ export const getSuggestedLecturers = async (classId) => {
     if (!eligibility.is_valid) continue;
 
     const totalHours = currentHours + (lecturer.taught_hours || 0);
-    const reasons = ["Đúng bộ môn", "Không trùng lịch", "Không vượt định mức giờ dạy"];
+    const isSameDept = String(lecturer.department_id?._id || lecturer.department_id) === String(deptId);
+    const reasons = [isSameDept ? "Đúng bộ môn" : "Cùng Khoa (Hỗ trợ giảng dạy)", "Không trùng lịch", "Không vượt định mức giờ dạy"];
     if (lecturer.preferences) {
       reasons.push(`Nguyện vọng: ${lecturer.preferences}`);
     }
@@ -317,12 +332,18 @@ export const getSuggestedLecturers = async (classId) => {
       max_hours: lecturer.max_hours,
       available_hours: Number(lecturer.max_hours || 0) - totalHours,
       preferences: lecturer.preferences || "Không có",
+      role_code: lecturer.user_id?.role_id?.code || lecturer.user_id?.role || "LECTURER",
       is_valid: true,
       reasons,
       violations: eligibility.violations,
     });
   }
 
-  // Thuật toán tối ưu: Cân bằng khối lượng giảng dạy bằng cách ưu tiên giảng viên có số giờ dạy ít nhất lên đầu
-  return suggestions.sort((a, b) => a.current_hours - b.current_hours);
+  // Thuật toán tối ưu: Ưu tiên giảng viên đúng bộ môn lên đầu, sau đó cân bằng giờ dạy
+  return suggestions.sort((a, b) => {
+    const aSame = a.reasons.includes("Đúng bộ môn") ? 1 : 0;
+    const bSame = b.reasons.includes("Đúng bộ môn") ? 1 : 0;
+    if (aSame !== bSame) return bSame - aSame;
+    return a.current_hours - b.current_hours;
+  });
 };
