@@ -39,7 +39,7 @@ export function Sidebar({ role, activePath, collapsed, navigate }) {
       <div className="sidebar-brand">
         <div className="brand-mark">UIS</div>
         <div>
-          <strong>PTIT HCM</strong>
+          <strong>TDK-CNPM</strong>
           <span>Credit Class System</span>
         </div>
       </div>

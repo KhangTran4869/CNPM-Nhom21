@@ -5,7 +5,7 @@ export function Header({ user, onMenu, onLogout }) {
     <header className="top-header">
       <div className="header-left">
         <Button variant="ghost-light" onClick={onMenu} aria-label="Toggle menu">☰</Button>
-        <strong>Hệ thống phân công giảng viên</strong>
+        <strong>Hệ thống phân công giảng viên giảng dạy lớp tín chỉ</strong>
       </div>
       <div className="header-user">
         <div className="avatar">{user?.name?.slice(0, 1)?.toUpperCase() || user?.username?.slice(0, 1)?.toUpperCase() || "U"}</div>
