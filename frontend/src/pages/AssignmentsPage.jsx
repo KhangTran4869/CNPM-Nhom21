@@ -46,7 +46,7 @@ export function AssignmentsPage({ user, navigate }) {
   const [loading, setLoading] = useState(false);
   const [isFixedClass, setIsFixedClass] = useState(false);
   const isLecturer = user?.role === "LECTURER";
-  const canWrite = user?.role === "ADMIN" || user?.role === "HEAD";
+  const canWrite = user?.role === "HEAD";
   const isAdmin = user?.role === "ADMIN";
   const isHead = user?.role === "HEAD";
   const canViewHistory = user?.role === "ADMIN" || user?.role === "HEAD";
@@ -308,9 +308,9 @@ export function AssignmentsPage({ user, navigate }) {
           ) : (
             <>
               {canViewHistory && <Button variant="outline" onClick={() => openHistory(row)}>Lịch sử</Button>}
-              {isAdmin && row.status === "PENDING" && <Button variant="primary" onClick={() => approve(row)}>Duyệt</Button>}
+              {isHead && row.status === "PENDING" && <Button variant="primary" onClick={() => approve(row)}>Duyệt</Button>}
               {canWrite && <Button variant="outline" onClick={() => openChangeLecturer(row)}>Sửa</Button>}
-              {isAdmin && <Button variant="danger" onClick={() => remove(row)}>Xóa</Button>}
+              {canWrite && <Button variant="danger" onClick={() => remove(row)}>Xóa</Button>}
             </>
           )}
         </div>
@@ -364,7 +364,7 @@ export function AssignmentsPage({ user, navigate }) {
                 Phân công tự động
               </Button>
             )}
-            {isAdmin && (
+            {isHead && (
               <Button
                 variant="outline"
                 style={{ borderColor: "var(--primary-color)", color: "var(--primary-color)", fontWeight: 600 }}
@@ -373,7 +373,7 @@ export function AssignmentsPage({ user, navigate }) {
                 Duyệt đề xuất (Pending)
               </Button>
             )}
-            {canWrite && <Button onClick={() => openCreate(false)}>{isHead ? "Đề xuất phân công" : "Thêm phân công"}</Button>}
+            {canWrite && <Button onClick={() => openCreate(false)}>Đề xuất phân công</Button>}
             {canViewHistory && <Button variant="outline" onClick={openGlobalHistory}>Lịch sử thay đổi</Button>}
             <Button variant="outline" onClick={load}>Làm mới</Button>
           </div>

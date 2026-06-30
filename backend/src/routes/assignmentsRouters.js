@@ -7,16 +7,16 @@ const routes = express.Router();
 
 routes.use(authenticate);
 routes.get("/", authorize("ADMIN", "HEAD", "LECTURER"), getAllAssignments);
-routes.post("/propose", authorize("ADMIN", "HEAD"), propose);
-routes.post("/check", authorize("ADMIN", "HEAD"), check);
-routes.post("/auto-assign", authorize("ADMIN", "HEAD"), autoAssign);
-routes.post("/", authorize("ADMIN"), createAssignment);
-routes.patch("/:id/approve", authorize("ADMIN"), approve);
-routes.patch("/:id/reject", authorize("ADMIN"), reject);
-routes.patch("/:id/change-lecturer", authorize("ADMIN", "HEAD"), changeLecturerController);
+routes.post("/propose", authorize("HEAD"), propose);
+routes.post("/check", authorize("HEAD"), check);
+routes.post("/auto-assign", authorize("HEAD"), autoAssign);
+routes.post("/", authorize("HEAD"), createAssignment);
+routes.patch("/:id/approve", authorize("HEAD"), approve);
+routes.patch("/:id/reject", authorize("HEAD"), reject);
+routes.patch("/:id/change-lecturer", authorize("HEAD"), changeLecturerController);
 routes.get("/:assignment_id/history", authorize("ADMIN", "HEAD"), getAllAssignmentsHistory);
 routes.get("/:id", authorize("ADMIN", "HEAD", "LECTURER"), getAssignmentById);
-routes.put("/:id", authorize("ADMIN", "HEAD"), updateAssignment);
-routes.delete("/:id", authorize("ADMIN"), deleteAssignment);
+routes.put("/:id", authorize("HEAD"), updateAssignment);
+routes.delete("/:id", authorize("HEAD"), deleteAssignment);
 
 export default routes;

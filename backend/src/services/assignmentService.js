@@ -102,9 +102,6 @@ export const updateAssignmentRecord = async ({ id, lecturer_id, status, note, us
     });
     updates.lecturer_id = lecturer_id;
 
-    if (userRole === "HEAD") {
-      nextStatus = "PENDING";
-    }
 
     await AssignmentHistory.create({
       assignment_id: assignment._id,
@@ -199,9 +196,6 @@ export const changeLecturer = async ({ id, new_lecturer_id, note, user, userRole
   assignment.lecturer_id = new_lecturer_id;
   assignment.note = note.trim();
 
-  if (userRole === "HEAD") {
-    assignment.status = "PENDING";
-  }
 
   await assignment.save();
 

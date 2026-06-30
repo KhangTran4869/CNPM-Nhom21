@@ -12,7 +12,7 @@ const menu = {
   HEAD: [
     { path: "/lecturers", label: "Danh sách giảng viên" },
     { path: "/classes", label: "Danh sách lớp tín chỉ" },
-    { path: "/assignments", label: "Đề xuất phân công" },
+    { path: "/assignments", label: "Phân công & Duyệt giảng dạy" },
     { path: "/reports", label: "Báo cáo thống kê" },
   ],
   ADMIN: [
@@ -23,7 +23,6 @@ const menu = {
     { path: "/semesters", label: "Quản lý học kỳ" },
     { path: "/classes", label: "Quản lý lớp tín chỉ" },
     { path: "/rooms", label: "Quản lý phòng học" },
-    { path: "/assignments", label: "Phân công & Duyệt giảng dạy" },
     { path: "/reports", label: "Báo cáo thống kê" },
   ],
 };
