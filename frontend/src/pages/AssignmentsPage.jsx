@@ -380,7 +380,7 @@ export function AssignmentsPage({ user, navigate }) {
         }
       >
         <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
-          <label style={{ fontWeight: 600, fontSize: "14px", color: "#334155", whiteSpace: "nowrap" }}>📅 Lọc theo học kỳ:</label>
+          <label style={{ fontWeight: 600, fontSize: "14px", color: "#334155", whiteSpace: "nowrap" }}> Lọc theo học kỳ:</label>
           <select
             value={semesterFilter}
             onChange={(e) => setSemesterFilter(e.target.value)}
@@ -487,7 +487,7 @@ export function AssignmentsPage({ user, navigate }) {
                       boxShadow: "0 0 0 2px #3b82f6"
                     }} />
                     <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px", fontWeight: 600 }}>
-                      🕒 {formatDateTime(item.changed_at)}
+                       {formatDateTime(item.changed_at)}
                     </div>
                     <div style={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "12px", position: "relative" }}>
                       {isAdmin && (
@@ -509,27 +509,27 @@ export function AssignmentsPage({ user, navigate }) {
                           }}
                           onClick={() => removeHistoryItem(item._id)}
                         >
-                          🗑️ Xóa
+                           Xóa
                         </button>
                       )}
                       {!selectedAssignment && (
                         <div style={{ fontSize: "14px", color: "#2563eb", fontWeight: "bold", marginBottom: "6px", borderBottom: "1px dashed #cbd5e1", paddingBottom: "4px", paddingRight: "50px" }}>
-                          🏷️ Lớp: {item.assignment_id?.class_id?.code || "N/A"} {item.assignment_id?.class_id?.course_id?.name ? `(${item.assignment_id.class_id.course_id.name})` : ""}
+                          Lớp: {item.assignment_id?.class_id?.code || "N/A"} {item.assignment_id?.class_id?.course_id?.name ? `(${item.assignment_id.class_id.course_id.name})` : ""}
                         </div>
                       )}
                       <div style={{ fontSize: "14px", color: "#1e293b", marginBottom: "6px" }}>
                         <span>GV cũ: </span>
                         <strong style={{ color: "#ef4444" }}>{item.old_lecturer_id?.name || item.old_lecturer?.name || "Chưa có"}</strong>
-                        {" ➔ "}
+                        {"  "}
                         <span>GV mới: </span>
                         <strong style={{ color: "#10b981" }}>{item.new_lecturer_id?.name || item.new_lecturer?.name || "N/A"}</strong>
                       </div>
                       <div style={{ fontSize: "13px", color: "#475569", marginBottom: item.reason ? "6px" : "0" }}>
-                        👤 <strong>Người thực hiện:</strong> {item.changed_by?.name || item.changed_by?.username || item.changed_by_name || "Quản trị viên"}
+                         <strong>Người thực hiện:</strong> {item.changed_by?.name || item.changed_by?.username || item.changed_by_name || "Quản trị viên"}
                       </div>
                       {item.reason && (
                         <div style={{ fontSize: "13px", color: "#334155", backgroundColor: "#f1f5f9", padding: "6px 10px", borderRadius: "4px", fontStyle: "italic", borderLeft: "3px solid #64748b" }}>
-                          💬 <strong>Lý do:</strong> {item.reason}
+                           <strong>Lý do:</strong> {item.reason}
                         </div>
                       )}
                     </div>
